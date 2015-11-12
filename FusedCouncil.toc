@@ -1,0 +1,7 @@
+## Interface: 60200
+## Title: Fused Council
+## Version: 0.8
+## Author: Doomruller
+
+test1.lua
+LootMember.lua
