@@ -15,18 +15,20 @@ function LootMember:CreateWindow(o)
  self.frame = CreateFrame("Frame", "memberFrame",  UIParent, "TooltipBorderedFrameTemplate");
  
 	local frame = self.frame;
-	 frame:SetFrameStrata("HIGH");
-	self.frame:SetPoint("CENTER", UIParent, "CENTER");
-	self.frame:SetSize(900,400);
-	self.frame:SetMovable(true);
-	self.frame:EnableMouse(true);
-	self.frame:RegisterForDrag("LeftButton");
-	self.frame:SetScript("OnDragStart", function () self.frame:StartMoving() end);
-	self.frame:SetScript("OnDragStop", function () self.frame:StopMovingOrSizing() end );
+	frame:SetFrameStrata("HIGH");
+	frame:Hide();
+	frame:SetPoint("CENTER", UIParent, "CENTER");
+	frame:SetSize(900,400);
+	frame:SetMovable(true);
+	frame:EnableMouse(true);
+	frame:RegisterForDrag("LeftButton");
+	frame:SetScript("OnDragStart", function () self.frame:StartMoving() end);
+	frame:SetScript("OnDragStop", function () self.frame:StopMovingOrSizing() end );
 	
-	self.frame.parentObject = o;
+	frame.parentObject = o;
 	local function eventHandeler(self, event, prefix, ...)
 		if event == "CHAT_MSG_ADDON" and prefix == "FLC_PREFIX" then
+	
 			local message, _, sender = ...;
 			local splitMessage = frame.parentObject:split(message,"^");
 			if #splitMessage > 0 then
@@ -50,6 +52,8 @@ for i = 1, #self.responses do
 	
 	if #self.responses == 0 then
 		self.frame:Hide();
+		else
+		self.frame:Show();
 	end
 end
 function LootMember:AddResponseWindow(lootLink, currentResponseNum)
@@ -72,9 +76,9 @@ function LootMember:AddResponseWindow(lootLink, currentResponseNum)
 	tempResponse.frame:SetSize(900,100);
 	
 	tempResponse.frame.IconFrame = CreateFrame("Frame", nil,  self.frame);
-	tempResponse.frame.IconFrame :SetSize(75,75);
-	tempResponse.frame.IconFrame:SetPoint("TopLeft", 15, -12 )
-	tempTexture = tempResponse.frame.IconFrame :CreateTexture("itemFrame".. (#self.responses + 1).. "Texture");
+	tempResponse.frame.IconFrame:SetSize(75,75);
+	tempResponse.frame.IconFrame:SetPoint("TopLeft",tempResponse.frame , 15, -12 )
+	tempTexture = tempResponse.frame.IconFrame:CreateTexture("itemFrame".. (#self.responses + 1).. "Texture");
 		tempTexture:SetTexture(itemTexture);
 		tempTexture:SetAllPoints(tempResponse.frame.IconFrame);
 			
@@ -122,6 +126,7 @@ function LootMember:AddResponseWindow(lootLink, currentResponseNum)
 	self:Update();
 end
 function LootMember:removeResponse(index)
+		print("removing" .. index)
 		table.remove(self.responses, index);
 		self:Update();
 end

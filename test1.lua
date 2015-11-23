@@ -50,7 +50,7 @@ function LootCouncil:CreateWindow(o)
 			if #splitMessage > 0 then
 				if splitMessage[1] == "B" then
 				for i=1, #splitMessage do
-					print(splitMessage[i])
+					--print(splitMessage[i])
 				end
 				
 				window.parentObject:AddResponse(splitMessage[2], splitMessage[3], splitMessage[4],splitMessage[5],splitMessage[6], splitMessage[7]);
@@ -192,7 +192,6 @@ function LootCouncil:GetResponses()
 end
 
 function LootCouncil:AddResponse(...)
-		print(...)
 		local tempFrame =  CreateFrame("Frame", nil,  self:GetChildFrame());
 		local subFrames = {};
 		for i =1, 9 do
@@ -211,7 +210,7 @@ function LootCouncil:AddResponse(...)
 			frameTuple[i]:SetText(tempToken);
 			frameTuple[i]:SetPoint("CENTER",0, 0); 
 			if tempToken ~= nil then
-			print(tempToken.. " ".. 20+ (90*(i-1)) )
+			--print(tempToken.. " ".. 20+ (90*(i-1)) )
 			end
 		end
 
@@ -272,7 +271,6 @@ function LootCouncil:AddItemToList(lootIcon, lootName, lootQuality, lootLink)
 		end
 		
 		SendAddonMessage( "FLC_PREFIX", "A".. "^"..lootLink, "RAID" );
-		print("sent msg")
 		self:Update();
 end
 
@@ -325,6 +323,9 @@ function LootCouncil:SetMainWindowShowing(setBool)
 	self.mainWindowShowing = setBool;
 end
 
+function LootCouncil:Show()
+	self.window:Show();
+end
 
 
 
