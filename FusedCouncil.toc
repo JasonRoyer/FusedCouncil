@@ -3,5 +3,6 @@
 ## Version: 0.8
 ## Author: Doomruller
 
+ResponsePool.lua
 test1.lua
 LootMember.lua

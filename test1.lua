@@ -6,7 +6,6 @@ LootCouncil = {
  -- current item will be a frame
  currentItem = nil,
  itemList = {},
- responses = {},
  labelButtons = {},
  mainWindowShowing = true,
  passingLootOut = false,
@@ -43,6 +42,7 @@ function LootCouncil:CreateWindow(o)
 				window.parentObject:AddItemToList(lootIcon, lootName, lootQuality, lootLink);
 				
 			end
+			window.parentObject:Show();
 			window.parentObject.passingLootOut = true;
 		elseif event == "CHAT_MSG_ADDON" and prefix == "FLC_PREFIX" then
 			local message, _, sender = ...;
@@ -206,20 +206,31 @@ function LootCouncil:AddResponse(...)
 		frameTuple = {};
 		for i=1, select("#", ...)do
 			frameTuple[i] = subFrames[i]:CreateFontString(nil, "BACKGROUND", "GameFontNormal");
-			tempToken = select(i, ...);
+			tempToken = select(i +1, ...);
 			frameTuple[i]:SetText(tempToken);
 			frameTuple[i]:SetPoint("CENTER",0, 0); 
 			if tempToken ~= nil then
 			--print(tempToken.. " ".. 20+ (90*(i-1)) )
 			end
 		end
+		
+		local itemResponseList = self.itemList[self:FindItemIndex(select(1, ...))].responses;
+		
 
-		tempFrame:SetPoint("Top", 0, -25*(#self.responses) )
-		self.responses[#self.responses + 1] = tempFrame;
-		self:GetChildFrame():SetSize(800, 2500 *(#self.responses));
+		tempFrame:SetPoint("Top", 0, -25*(#itemResponseList) )
+		itemResponseList[#itemResponseList + 1] = tempFrame;
+		self:GetChildFrame():SetSize(800, 2500 *(#self.itemList));
 	
 end
 
+function LootCouncil:FindItemIndex(itemLink)
+  for i=1, #self.itemList do
+      if self.itemList[i].itemLink == itemLink then
+      return i;
+      end
+  end
+  return -1;
+end
 
 
 function LootCouncil:Update()
@@ -239,9 +250,10 @@ function LootCouncil:Update()
 end
 function LootCouncil:CreateItem(lootIcon, lootName, lootQuality, lootLink)
 
-	local tempItem = {itemIcon = lootIcon, itemName = lootName, itemQuality = lootQuality, itemLink=lootLink}
+	local tempItem = {itemIcon = lootIcon, itemName = lootName, itemQuality = lootQuality, itemLink=lootLink, responses = {}}
 		tempItem.frame = CreateFrame("Frame", "itemFrame".. (#self.itemList + 1),  self:GetWindow());
 		tempItem.frame:SetSize(50,50);
+		tempItem.frame.Item = tempItem.frame;
 		tempTexture = tempItem.frame:CreateTexture("itemFrame".. (#self.itemList + 1).. "Texture");
 		tempTexture:SetTexture(lootIcon);
 		tempTexture:SetAllPoints(tempItem.frame);
@@ -255,6 +267,12 @@ function LootCouncil:CreateItem(lootIcon, lootName, lootQuality, lootLink)
 		tempItem.frame:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end);
+		local councilObject = self;
+		tempItem.frame:SetScript("OnMouseDown", function()
+		  tempMovableItem = councilObject:GetCurrentItem();
+		  
+		
+		 end);
 		
 		return tempItem;
 
