@@ -4,5 +4,5 @@
 ## Author: Doomruller
 
 ResponsePool.lua
-test1.lua
+LootMaster.lua
 LootMember.lua

@@ -66,13 +66,52 @@ function LootMember:AddResponse(lootLink)
     response="",
     note=""}
 
-  if _G[itemEquipSlot] ~= nil then
-  -- needs to deal with weps. "slot doesnt work"
-  print(itemEquipSlot)
-  print(_G[itemEquipSlot].."slot")
-    tempResponse.currentItem=GetInventoryItemLink("player",GetInventorySlotInfo(_G[itemEquipSlot].."slot"))
+  if itemEquipSlot ~= "" then
+    if _G[itemEquipSlot] ~= nil then
+    -- needs to deal with weps. "slot doesnt work"
+    local equipSlot = -1;
+      if (_G[itemEquipSlot] == "Head")then
+      equipSlot = 1;
+      elseif(_G[itemEquipSlot] == "Neck") then
+      equipSlot = 2;
+      elseif(_G[itemEquipSlot] == "Shoulder") then
+      equipSlot = 3;
+      elseif(_G[itemEquipSlot] == "Chest") then
+      equipSlot = 5;
+      elseif(_G[itemEquipSlot] == "Waist") then
+      equipSlot = 6;
+      elseif(_G[itemEquipSlot] == "Legs") then
+      equipSlot = 7;
+      elseif(_G[itemEquipSlot] == "Feet") then
+      equipSlot = 8;
+      elseif(_G[itemEquipSlot] == "Wrist") then
+      equipSlot = 9;
+      elseif(_G[itemEquipSlot] == "Hands") then
+      equipSlot = 10;
+      elseif(_G[itemEquipSlot] == "Fingers") then
+      equipSlot = 11;
+      elseif(_G[itemEquipSlot] == "Trinket") then
+      equipSlot = 13;
+      elseif(_G[itemEquipSlot] == "Back") then
+      equipSlot = 15;
+      elseif(_G[itemEquipSlot] == "One-Hand") then
+      equipSlot = 16;
+      elseif(_G[itemEquipSlot] == "Shield") or(_G[itemEquipSlot] == "Off-Hand Weapon") or (_G[itemEquipSlot] == "Held in Off-Hand") then
+      equipSlot = 17;
+      elseif(_G[itemEquipSlot] == "Two-Hand Weapon") or (_G[itemEquipSlot] == "Main-Hand Weapon")  then
+      equipSlot = 16;
+      else
+      
+      end
+    
+    
+      print(_G[itemEquipSlot] .. equipSlot)
+      tempResponse.currentItem=GetInventoryItemLink("player",equipSlot)
+    else
+      tempResponse.currentItem = "None"
+    end
   else
-    tempResponse.currentItem = "None"
+  tempResponse.currentItem = "None"
   end
 
   local tempResponseFrame = GetResponseFrame(self:GetFrame(),itemTexture,lootLink);
@@ -123,7 +162,11 @@ end
 
 
 function LootMember:removeResponse(index)
+  print("removing index " .. index)
     ReleaseResponseFrame(table.remove(self.currentResponses, index).Frame);
+    for i=index, #self.currentResponses do
+      self.currentResponses[i].Frame.ResponseNum = self.currentResponses[i].Frame.ResponseNum -1;
+    end
     self:Update();
 end
 
