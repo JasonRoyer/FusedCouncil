@@ -1,4 +1,4 @@
-1 Notes are not sending
+
 2 Multiple items of same name. how do we want to handle that? make an ID (same item different id, socket should be different link)
 w3 sort by button click on top.
 4 Pass out loot

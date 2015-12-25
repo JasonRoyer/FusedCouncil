@@ -43,7 +43,9 @@ function LootCouncil:CreateWindow(o)
       local splitMessage = o:splitMSG(message);
       if #splitMessage > 0 then
         if splitMessage[1] == "B" then
-          o:AddResponse(splitMessage[2], splitMessage[3], splitMessage[4],splitMessage[5],splitMessage[6], splitMessage[7],splitMessage[8]);
+        print("got response from " ..splitMessage[7] )
+          o:AddResponse(splitMessage[2], splitMessage[3], splitMessage[4],splitMessage[5],splitMessage[6], splitMessage[7],splitMessage[8],splitMessage[9]);
+          o:Update();
         end
 
       end
@@ -106,10 +108,8 @@ function LootCouncil:CreateWindow(o)
   giveButton:SetScript("OnMouseup", function()
     local personIndex;
     for i=1, GetNumGroupMembers() do 
-    print("group member" .. GetMasterLootCandidate(o.currentItem.itemPosition,i) .. " person selected " .. o.personSelected)
       if o.personSelected == GetMasterLootCandidate(o.currentItem.itemPosition,i) then
         personIndex = i;
-        print(o.personSelected .. " found at " .. personIndex)
       end
     end
     if personIndex ~= nil then

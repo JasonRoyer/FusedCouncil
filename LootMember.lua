@@ -57,12 +57,11 @@ function LootMember:AddResponse(lootLink)
 
   local _, myIlvl = GetAverageItemLevel();
   local itemEquipSlot, itemTexture = select(9, GetItemInfo(lootLink));
-
   local tempResponse = {
     name = GetUnitName("player",false),
     ilvl = math.floor(myIlvl+0.5),
     score = 0,
-    rank= select(2, GetGuildInfo("player")),
+    rank= select(2, GetGuildInfo("player")) or "no guild",
     response="",
     note=""}
 
@@ -98,15 +97,17 @@ function LootMember:AddResponse(lootLink)
       equipSlot = 16;
       elseif(_G[itemEquipSlot] == "Shield") or(_G[itemEquipSlot] == "Off-Hand Weapon") or (_G[itemEquipSlot] == "Held in Off-Hand") then
       equipSlot = 17;
-      elseif(_G[itemEquipSlot] == "Two-Hand Weapon") or (_G[itemEquipSlot] == "Main-Hand Weapon")  then
+      elseif(_G[itemEquipSlot] == "Two-Hand") or (_G[itemEquipSlot] == "Main-Hand Weapon")  then
       equipSlot = 16;
       else
       
       end
-    
-    
-      print(_G[itemEquipSlot] .. equipSlot)
-      tempResponse.currentItem=GetInventoryItemLink("player",equipSlot)
+      print(_G[itemEquipSlot] .. " ".. equipSlot)
+      if (GetInventoryItemLink("player",equipSlot) == nil) then
+        tempResponse.currentItem = "None"
+      else 
+            tempResponse.currentItem=GetInventoryItemLink("player",equipSlot)
+      end
     else
       tempResponse.currentItem = "None"
     end
@@ -121,6 +122,7 @@ function LootMember:AddResponse(lootLink)
   for i=1, #tempResponseFrame.Buttons do
 
     tempResponseFrame.Buttons[i]:SetScript("OnClick", function(self)
+
       tempResponse.response = self:GetText();
       tempResponse.note = tempResponseFrame.NoteBox:GetText();
       object:removeResponse(tempResponseFrame.ResponseNum);
