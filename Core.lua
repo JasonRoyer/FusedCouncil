@@ -161,6 +161,30 @@ function FC_FindItem(itemLink)
   return nil;
 end
 
+function FC_Sort(table, index)
+  if index == 1  then 
+    for i=1, #table-1 do
+      local j=i;
+      while j > 0 and table[j]:getPlayerName() > table[j +1]:getPlayerName() do
+          local temp = table[j];
+          table[j] = table[j+1];
+          table[j+1] = temp;
+          j=j-1;
+      end
+    end
+  else
+     for i=1, #table-1 do
+      local j=i;
+      while j > 0 and table[j]:getPlayerIlvl() > table[j +1]:getPlayerIlvl() do
+          local temp = table[j];
+          table[j] = table[j+1];
+          table[j+1] = temp;
+          j=j-1;
+      end
+    end
+  end
+
+end
 -------------------------------------------
 -------     CREATE FRAMES SECTION ---------
 -------------------------------------------
@@ -209,6 +233,13 @@ function CreateMainFrame()
     labelButtons[i] = CreateFrame("Button", labelsNames[i].."LabelButton", tempFrame, "MagicButtonTemplate" );
     labelButtons[i]:SetText(labelsNames[i]);
     labelButtons[i]:SetPoint("TopLeft",tempFrame, 20+ (90*(i-1)), -100);
+    labelButtons[i]:SetScript("OnMouseDown", function()  
+       if currentItem ~= nil then
+          FC_Sort(currentItem:getResponseTable(), i);
+          FusedCouncil_Update();
+       end
+    
+    end);
   end
   
   local giveButton = CreateFrame("Button", nil, tempFrame, "MagicButtonTemplate" );
