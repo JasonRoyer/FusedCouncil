@@ -1,0 +1,8 @@
+Bugs
+multiple items go to same response
+response #2 done first does not get taken away
+
+
+TODO
+Add loot button
+create frame pools for main's reponses, icons, 
