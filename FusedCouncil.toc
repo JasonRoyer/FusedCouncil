@@ -1,7 +1,14 @@
 ## Interface: 60200
 ## Title: Fused Council
 ## Version: 0.8
+## SavedVariables: FusedCouncilDB
 ## Author: Doomruller
 
-test1.lua
-LootMember.lua
+embeds.xml
+
+Response.lua
+Item.lua
+
+
+Core.lua
+LootFrame.lua
