@@ -13,6 +13,7 @@ local currentResponseFrames = {};
 local itemFrames = {};
 local addonPrefix = "FusedCouncil";
 local personSelected = "";
+local isTesting = false;
 
 function FusedCouncil:OnInitialize()
   
@@ -50,7 +51,7 @@ function FusedCouncil:LootOpenedHandeler()
 end -- end LootOpenedHandeler
 
 function FusedCouncil:Test(itemTable)
-print("testing")
+    isTesting = true;
     local itemLinks = {};
       for i=1, #itemTable do
         local lootLink = itemTable[i] ;
@@ -150,7 +151,7 @@ function FusedCouncil_Update()
 
 
 end
-
+ 
 
 function FC_FindItem(itemLink)
   for i=1, #items do
@@ -161,28 +162,27 @@ function FC_FindItem(itemLink)
   return nil;
 end
 
-function FC_Sort(table, index)
-  if index == 1  then 
+function FC_Sort(table, sortFunction)
+    -- if the table is alreaded sorted isSorted will stay true
+    local isSorted = true;
     for i=1, #table-1 do
       local j=i;
-      while j > 0 and table[j]:getPlayerName() > table[j +1]:getPlayerName() do
+      while j > 0 and sortFunction(table[j], table[j+1]) do
+          isSorted = false;
           local temp = table[j];
           table[j] = table[j+1];
           table[j+1] = temp;
           j=j-1;
       end
     end
-  else
-     for i=1, #table-1 do
-      local j=i;
-      while j > 0 and table[j]:getPlayerIlvl() > table[j +1]:getPlayerIlvl() do
-          local temp = table[j];
-          table[j] = table[j+1];
-          table[j+1] = temp;
-          j=j-1;
+    -- if it was already sorted reverse the list
+    if isSorted then
+      for i=1, #table/2 do
+        local temp = table[i];
+        table[i] = table[#table - (i-1)]
+        table[#table - (i-1)] = temp;
       end
     end
-  end
 
 end
 -------------------------------------------
@@ -227,6 +227,7 @@ function CreateMainFrame()
   end );
   
     -- create reponse table attributes
+  --                      1     2       3           4           5         6         7               9
   local labelsNames = {"Name","ilvl","Score", "Current Item", "Rank", "Response", "Note", "Vote", "Votes"}
 
   for i=1 , #labelsNames do
@@ -235,7 +236,24 @@ function CreateMainFrame()
     labelButtons[i]:SetPoint("TopLeft",tempFrame, 20+ (90*(i-1)), -100);
     labelButtons[i]:SetScript("OnMouseDown", function()  
        if currentItem ~= nil then
-          FC_Sort(currentItem:getResponseTable(), i);
+          if i == 1 then
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.nameCompare);
+          elseif i==2 then
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.ilvlCompare);
+          elseif i ==3 then
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.scoreCompare);
+          elseif i==4 then
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.itemCompare);
+          elseif i==5 then
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.rankCompare);
+          elseif i==6 then
+          
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.responseCompare);
+          elseif i==7 then
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.noteCompare);
+          elseif i==9 then
+          FC_Sort(currentItem:getResponseTable(), FC_Utils.votesCompare);
+          end
           FusedCouncil_Update();
        end
     
@@ -248,6 +266,9 @@ function CreateMainFrame()
   
   giveButton:SetScript("OnMouseup", function()
   -- fix all this nonsense
+  -- does loot change if you loot 1 item then reopen it?
+  -- could proccess the loot after you open it again, aka look for item links
+  --getlootbyitemLink() function?
   if personSelected ~= "" then
     print("gave ".. currentItem:getItemLink() .. " to " .. personSelected)
   end
@@ -524,4 +545,4 @@ SlashCmdList["FLC"] = function()
   print("slash cammand")
     FusedCouncil:Test({GetInventoryItemLink("player",1),GetInventoryItemLink("player",5)})
   end
-
+ 
