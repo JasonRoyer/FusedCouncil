@@ -17,6 +17,62 @@ local addonPrefix = "FusedCouncil";
 local personSelected = "";
 local isTesting = false;
 local fakePeople = {"bob","steve","jason","Ajohny"}
+local optionRespones = 1;
+local responseNames = {"Bis", "Major","Minor", "Reroll", "OffSpec", "Transmog", "Pass"};
+local options = {
+  name ="FusedCouncil",
+  type="group",
+  -- can have set and get defined to get from DB
+  args = {
+    global = {
+       order =1,
+       name = "General config",
+       type ="group",
+       
+       args = {
+          help = {
+             order=0,
+             type = "description",
+             name = "FusedCouncil is an in game loot distribution system."
+          
+          },
+          
+          buttons = {
+            order =1,
+            type = "group",
+            guiInline = true,
+            name = "Response Buttons",
+              args = {
+                  help = {
+                    order =0,
+                    type="description",
+                    name = "Allows the configuration of response buttons"
+                  
+                  },
+                  numButtons = {
+                      type = "range",
+                    width = 'full',
+                      order = 1,
+                      name = "Amount of buttons to display:",
+                      min = 1,
+                      max = 5,
+                      step = 1,
+                      set = function(info, val)optionRespones = val end,
+                      get = function(info) return optionRespones end,
+                  },
+                  button1 = {
+                    type = "input",
+                    name = "button1",
+                    set = function(info, val) responseNames[1] = val end,
+                    get  = function(info, val) return responseNames[1] end,
+                  },    
+              },      
+          },              
+       },
+    },
+  },
+
+};
 
 function FusedCouncil:OnInitialize()
   
@@ -25,11 +81,19 @@ function FusedCouncil:OnInitialize()
   FusedCouncil_MinFrame = CreateMinFrame();
   -- set DB for saving variables
   self.db = LibStub("AceDB-3.0"):New("FusedCouncilDB");
+  
+
 end
 
 function FusedCouncil:OnEnable()
   self:RegisterEvent("LOOT_OPENED", "LootOpenedHandeler");
   self:RegisterComm(addonPrefix, "CoreCommHandler")
+   -- LibStub("AceConfig-3.0"):RegisterOptionsTable("FusedCouncil", options, {"fcslash", "fcslashtwo"})
+  local config = LibStub("AceConfig-3.0")
+  config:RegisterOptionsTable("FusedCouncil Options", options)
+
+  local dialog = LibStub("AceConfigDialog-3.0")
+  dialog:AddToBlizOptions("FusedCouncil Options", "FusedCouncil", nil, 'global')
 end
 
 function FusedCouncil:OnDisable()
