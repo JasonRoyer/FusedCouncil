@@ -1,5 +1,5 @@
 FC_Utils ={
-
+print("these got read");
 nameCompare = function(response1, response2) 
  return response1:getPlayerName() > response2:getPlayerName();
 
@@ -27,6 +27,7 @@ rankCompare = function(response1, response2)
       local playerRank1 = select(3, GetGuildInfo(response1:getPlayerName()));
       local playerRank2 = select(3, GetGuildInfo(response2:getPlayerName()));
       -- GM is rank 0 lowest rank should be highest num
+      print(playerRank1.. " " ..playerRank2)
       return playerRank1 < playerRank2;
 
 end;
@@ -37,7 +38,7 @@ responseCompare = function(response1, response2)
 end;
 
 noteCompare = function(response1, response2)
-  return response1:getNote() > response2:getNote();
+  return response1:getNote() ~= "" and response2:getNote() == "";
 end;
 
 votesCompare = function(response1,response2)

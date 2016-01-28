@@ -6,14 +6,17 @@
  FusedCouncil_MinFrame = {};
 local labelButtons = {};
 local currentItemFontString = {};
-local items = {};
+local itemsToBeLooted = {};
+local itemsLooted = {};
 local currentItem;
 local currentItemFrame ={};
 local currentResponseFrames = {};
-local itemFrames = {};
+local itemToBeLootedFrames = {};
+local itemsLootedFrames = {};
 local addonPrefix = "FusedCouncil";
 local personSelected = "";
 local isTesting = false;
+local fakePeople = {"bob","steve","jason","Ajohny"}
 
 function FusedCouncil:OnInitialize()
   
@@ -61,7 +64,7 @@ function FusedCouncil:Test(itemTable)
       if #itemLinks > 0 then
       local data = FusedCouncil:Serialize(itemLinks) -- itemLinks is a table of item links
       FusedCouncil:SendCommMessage(addonPrefix, "lootTable " ..data , "RAID");
-
+    
      FusedCouncil_Update();
       end
 end -- end Test
@@ -76,6 +79,13 @@ function FusedCouncil:CoreCommHandler(prefix, message, distribution, sender)
     if cmd == "addResponse" then
       local newResponse = Response:new(responseObject);
       FC_FindItem(newResponse:getItemLink()):addResponse(newResponse);
+      
+      for i=1,#fakePeople do
+      newResponse = Response:new(responseObject.itemLink, fakePeople[i], responseObject.playerIlvl - i, 0,responseObject.playerGuildRank, responseObject.playerResponse, i, responseObject.playerItem, nil );
+      FC_FindItem(newResponse:getItemLink()):addResponse(newResponse);
+      end
+
+      
       FusedCouncil_Update();
     elseif cmd == "vote" then
       print("voting")
@@ -97,13 +107,14 @@ function FusedCouncil:CoreCommHandler(prefix, message, distribution, sender)
 end -- end CoreCommHandler
 
 function AddItem(item)
-  table.insert(items, item);
-  table.insert(itemFrames, FC_GetFreeItemFrame(item));
+  table.insert(itemsToBeLooted, item);
+  table.insert(itemToBeLootedFrames, FC_GetFreeItemFrame(item));
   
   if currentItem == nil then
      SetCurrentItem(item);
   end
 end
+
 
 function SetCurrentItem(item)
  if currentItem ~= nil then
@@ -121,14 +132,64 @@ function SetCurrentItem(item)
    FusedCouncil_Update();  
   
 end -- end SetCurrentItem
-
-
+function ClearForNextUse()
+ currentItemFontString = {};
+ itemsToBeLooted = {};
+ itemsLooted = {};
+ currentItem = nil;
+ currentItemFrame ={};
+  for i=1, #currentResponseFrames do
+  ReleaseResponseFrame(table.remove(currentResponseFrames, 1));
+ end
+ for i=1, #currentResponseFrames do
+ 
+ end
+ for i=1, #itemToBeLootedFrames do
+  ReleaseItemFrame(table.remove(itemToBeLootedFrames, 1));
+ end
+  for i=1, #itemsLootedFrames do
+  ReleaseItemFrame(table.remove(itemsLootedFrames, 1));
+ end
+ personSelected = "";
+ FusedCouncil_MainFrame:Hide();
+end
+function FC_GiveItem()
+  -- fix all this nonsense
+  -- does loot change if you loot 1 item then reopen it?
+  -- could proccess the loot after you open it again, aka look for item links
+  --getlootbyitemLink() function?
+  if personSelected ~= "" and FC_FindItemIndex(itemsToBeLooted, currentItem:getItemLink()) ~= -1 then
+    local index = FC_FindItemIndex(itemsToBeLooted, currentItem:getItemLink());
+    print(index)
+    local itemGiven = table.remove(itemsToBeLooted, index);
+    local itemGivenFrame = table.remove(itemToBeLootedFrames, index);
+    table.insert(itemsLooted, itemGiven);
+    itemGivenFrame.highlightFrame:Show();
+    table.insert(itemsLootedFrames, itemGivenFrame);
+    
+    
+    if #itemsToBeLooted == 0 then
+      ClearForNextUse();
+    else
+      SetCurrentItem(itemsToBeLooted[1]);
+      FusedCouncil_Update();
+    end
+    
+  end
+end
 function FusedCouncil_Update()
 
     -- repaint all of the items in items[]
-    if itemFrames ~= nil then
-      for i=1, #itemFrames do 
-        itemFrames[i]:SetPoint("TopLeft", FusedCouncil_MainFrame, 20 + 60 * (i-1), -430);
+    if itemToBeLootedFrames ~= nil then
+      for i=1, #itemToBeLootedFrames do 
+        itemToBeLootedFrames[i]:SetPoint("TopLeft", FusedCouncil_MainFrame, 20 + 60 * (i-1), -430);
+      end
+      
+    end
+    
+    if itemsLootedFrames ~= nil then
+      for i=1, #itemsLootedFrames do 
+        itemsLootedFrames[i]:SetPoint("TopLeft", FusedCouncil_MainFrame, 20 + 60 * (#itemToBeLootedFrames + i-1), -430);
       end
       
     end
@@ -152,11 +213,18 @@ function FusedCouncil_Update()
 
 end
  
-
+function FC_FindItemIndex(itemTable, itemLink)
+  for i=1, #itemTable do
+    if itemTable[i]:getItemLink() == itemLink then
+      return i;
+    end
+  end
+  return -1;
+end
 function FC_FindItem(itemLink)
-  for i=1, #items do
-    if items[i]:getItemLink() == itemLink then
-      return items[i];
+  for i=1, #itemsToBeLooted do
+    if itemsToBeLooted[i]:getItemLink() == itemLink then
+      return itemsToBeLooted[i];
     end
   end
   return nil;
@@ -265,13 +333,8 @@ function CreateMainFrame()
   giveButton:SetPoint("TopLeft", 380, -390);
   
   giveButton:SetScript("OnMouseup", function()
-  -- fix all this nonsense
-  -- does loot change if you loot 1 item then reopen it?
-  -- could proccess the loot after you open it again, aka look for item links
-  --getlootbyitemLink() function?
-  if personSelected ~= "" then
-    print("gave ".. currentItem:getItemLink() .. " to " .. personSelected)
-  end
+
+    FC_GiveItem();
   end );
 
   tempFrame:CreateTexture("ItemFrameTexture");
@@ -299,7 +362,8 @@ function CreateMainFrame()
   tempFrame.childFrame = childFrame;
   
   
-  
+
+
 return tempFrame;
 end -- end CreateMainFrame
 
@@ -374,8 +438,17 @@ end -- end FC_GetFreeResponseFrame
 function CreateItemFrame()
   local tempFrame = CreateFrame("Frame", nil, FusedCouncil_MainFrame);
   tempFrame:SetSize(50,50);
-  tempFrame.texture = tempFrame:CreateTexture();
+  tempFrame.texture = tempFrame:CreateTexture(nil, "BACKGROUND");
   tempFrame.texture:SetAllPoints(tempFrame);
+  tempFrame.highlightFrame = CreateFrame("Frame", nil, tempFrame);
+  tempFrame.highlightFrame:SetSize(50,50);
+  tempFrame.highlightFrame:SetPoint("TopLeft",0,0);
+  tempFrame.highlightFrame:Hide();
+  tempFrame.highlightFrame.texture = tempFrame.highlightFrame:CreateTexture();
+  tempFrame.highlightFrame.texture:SetTexture(1,0,0,.2);
+  tempFrame.highlightFrame.texture:SetSize(50,50);
+  tempFrame.highlightFrame.texture:SetPoint("TopLeft", 0, 0)
+
   return tempFrame;
 end
 function CreateResponseFrame()
@@ -528,6 +601,7 @@ end -- end  FusedCouncil_AddResponse
 
 function ReleaseItemFrame(frame)
   frame:Hide();
+  frame.highlightFrame:Hide();
   table.insert(itemFramePool, frame);
 end
 function ReleaseResponseFrame(frame)
