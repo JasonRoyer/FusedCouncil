@@ -28,6 +28,7 @@ local itemTablex = {};
 local itemsFound = 0
 local checkAgain = {}
 local itemsFoundAgain = {};
+local optionsx = {};
 function LootModule:OnInitialize()
   FusedCouncil_LootFrame = FC_CreateLootFrame();
 end
@@ -38,28 +39,41 @@ function LootModule:OnEnable()
   self:RegisterComm("FusedCouncil");
 end
 
+
 -- The function fired everytime the prefix is recived. More info under Ace3comm.
 function LootModule:OnCommReceived(prefix, message, distribution, sender)
  
     -- split the message into the camand and the serialized data(Ace3), strsplit is in the wow api.
-   local cmd, data = strsplit(" ", message, 2);
+   local cmd, data, optionsTable = strsplit(" ", message, 3);
+   
    if cmd == "lootTable" then
-                                -- Deserialize the data with Ace3
-      local success, itemTable = LootModule:Deserialize(data)
+      local success, options = LootModule:Deserialize(optionsTable);
+      
       if success then
-      itemTablex = itemTable;
-        for i = 1, #itemTable do
-          if GetItemInfo(itemTable[i]) ~= nil then
-             FC_AddResponse(itemTable[i]);
-          else 
-             table.insert(checkAgain, itemTable[i]);
-             FusedCouncil_LootFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-         end
+        optionsx = options;
+
+        local success2, itemTable = LootModule:Deserialize(data);
+        if success2 then
+          itemTablex = itemTable;
+          for i = 1, #itemTable do
+            if GetItemInfo(itemTable[i]) ~= nil then
+               FC_AddResponse(itemTable[i]);
+            else 
+               table.insert(checkAgain, itemTable[i]);
+               FusedCouncil_LootFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED");
+           end
+          end
+        else
+           print("failed " .. itemTable);
         end
       else
-        print("failed " .. itemTable)
+        print("failed " .. options);
       end
+   
    end
+   
+   
+ 
     
 end -- end LootCommHandler
 
@@ -110,8 +124,9 @@ function FC_AddResponse(itemLink)
   local tempResponseFrame = FC_GetResponseFrame(FusedCouncil_LootFrame);
   tempResponseFrame.ResponseNum = #currentResponses+ 1;
   
-  for i=1, #tempResponseFrame.Buttons do
-  
+  for i=1, optionsx.numButtons do
+      tempResponseFrame.Buttons[i]:SetText(optionsx.responseNames[i]);
+      tempResponseFrame.Buttons[i]:Show();
       tempResponseFrame.Buttons[i]:SetScript("OnClick", function(self)
         tempResponse:setPlayerResponse(self:GetText());
         tempResponse:setNote(tempResponseFrame.NoteBox:GetText());
@@ -243,12 +258,12 @@ function FC_CreateResponseFrame(parent)
     
   tempFrame.IconFrame = tempIconFrame;  
   
-    local buttonTitles = {"Bis", "Major","Minor", "Reroll", "OffSpec", "Transmog", "Pass"};
     tempFrame.Buttons = {};
     
-    for i= 1, #buttonTitles do
+    for i= 1, 7 do
       local tempButton = CreateFrame("Button", nil, tempFrame, "MagicButtonTemplate" );
-      tempButton:SetText(buttonTitles[i]);
+      tempButton:SetText(i);
+      tempButton:Hide();
       tempButton:SetPoint("TopLeft",tempFrame, 110+ (110*(i-1)), -40);
       
       tempFrame.Buttons[i] = tempButton;
@@ -257,7 +272,7 @@ function FC_CreateResponseFrame(parent)
     
     
     local noteBox = CreateFrame("EditBox", nil , tempFrame, "InputBoxTemplate");
-    noteBox:SetSize(124*(#buttonTitles-1), 20);
+    noteBox:SetSize(700, 20);
     noteBox:SetPoint("TopLeft",110, -70);
     noteBox:SetAutoFocus(false);
     -- OnEnterPressed

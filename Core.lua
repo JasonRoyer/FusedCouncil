@@ -1,4 +1,4 @@
-
+ 
  FusedCouncil = LibStub("AceAddon-3.0"):NewAddon("FusedCouncil","AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
   FusedCouncil:SetDefaultModuleLibraries("AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
   FusedCouncil:SetDefaultModuleState(true);
@@ -15,11 +15,78 @@ local itemToBeLootedFrames = {};
 local itemsLootedFrames = {};
 local addonPrefix = "FusedCouncil";
 local personSelected = "";
+local isMasterLooter = false;
 local isTesting = false;
 local fakePeople = {"bob","steve","jason","Ajohny"}
-local optionRespones = 1;
-local responseNames = {"Bis", "Major","Minor", "Reroll", "OffSpec", "Transmog", "Pass"};
-local options = {
+local defaults = {
+  profile = {
+    options = {
+      numButtons = 7,
+      responseNames = {"Bis", "Major","Minor", "Reroll", "OffSpec", "Transmog", "Pass"},
+      lootCouncilMembers = {UnitName("player")},
+    },
+    currentItem = nil,
+    personSelected = "",
+    itemsToBeLooted = {},
+    itemsLooted = {},
+  },
+
+};
+
+
+function FusedCouncil:OnInitialize()
+  
+  --Set up frames
+  FusedCouncil_MainFrame = CreateMainFrame();
+  FusedCouncil_MinFrame = CreateMinFrame();
+  -- set DB for saving variables
+  self.db = LibStub("AceDB-3.0"):New("FusedCouncilDB",defaults, true);
+  self.db:RegisterDefaults(defaults);
+  if self.db.profile.currentItem ~= nil then
+  print("its diz many " .. #self.db.profile.itemsLooted)
+    local currentItemResponseTable = {};
+    for i=1, #self.db.profile.currentItem.responseTable do
+      table.insert(currentItemResponseTable, Response:new(self.db.profile.currentItem.responseTable[i]));
+    end
+    SetCurrentItem(Item:new(self.db.profile.currentItem.itemLink,currentItemResponseTable));
+    if self.db.profile.personSelected ~= "" then
+      personSelected = self.db.profile.personSelected;
+    end
+    
+    if #self.db.profile.itemsToBeLooted ~= 0 then
+      for i=1, #self.db.profile.itemsToBeLooted do
+        local tempItemResponseTable = {};
+        for k=1, #self.db.profile.itemsToBeLooted[i].responseTable do
+          table.insert(tempItemResponseTable, Response:new(self.db.profile.itemsToBeLooted[i].responseTable[k]));
+        end
+        AddItem(Item:new(self.db.profile.itemsToBeLooted[i].itemLink, tempItemResponseTable));
+      end
+    end
+    if #self.db.profile.itemsLooted ~= 0 then
+      for i=1, #self.db.profile.itemsLooted do
+        local tempItemResponseTable = {};
+        for k=1, #self.db.profile.itemsLooted[i].responseTable do
+          table.insert(tempItemResponseTable, Response:new(self.db.profile.itemsLooted[i].responseTable[k]));
+        end
+        local tempItem = Item:new(self.db.profile.itemsLooted[i].itemLink, tempItemResponseTable);
+        table.insert(itemsLooted, tempItem);
+        local tempFrame = FC_GetFreeItemFrame(tempItem);
+        tempFrame.highlightFrame:Show();
+        table.insert(itemsLootedFrames, tempFrame);
+      end
+    end
+    FusedCouncil_Update();
+   end
+end
+
+function FusedCouncil:OnEnable()
+  self:RegisterEvent("LOOT_OPENED", "LootOpenedHandeler");
+  self:RegisterComm(addonPrefix, "CoreCommHandler")
+  if select(2, GetLootMethod()) == 0 then
+    print("i am master looter")
+    isMasterLooter = true;
+  end 
+  local options = {
   name ="FusedCouncil",
   type="group",
   -- can have set and get defined to get from DB
@@ -55,39 +122,121 @@ local options = {
                       order = 1,
                       name = "Amount of buttons to display:",
                       min = 1,
-                      max = 5,
+                      max = 7,
                       step = 1,
-                      set = function(info, val)optionRespones = val end,
-                      get = function(info) return optionRespones end,
+                      set = function(info, val)  FusedCouncil.db.profile.options.numButtons = val end,
+                      get = function(info) return FusedCouncil.db.profile.options.numButtons end,
                   },
                   button1 = {
                     type = "input",
                     name = "button1",
-                    set = function(info, val) responseNames[1] = val end,
-                    get  = function(info, val) return responseNames[1] end,
-                  },    
+                    order = 2,
+                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[1] = val end,
+                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[1] end,
+                  },
+                  button2 = {
+                    type = "input",
+                    name = "button2",
+                    order = 3,
+                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 2 end,
+                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[2] = val end,
+                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[2] end,
+                  },
+                  button3 = {
+                    type = "input",
+                    name = "button3",
+                    order = 4,
+                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 3 end,
+                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[3] = val end,
+                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[3] end,
+                  },
+                  button4 = {
+                    type = "input",
+                    name = "button4",
+                    order = 5,
+                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 4 end,
+                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[4] = val end,
+                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[4] end,
+                  },  
+                  button5 = {
+                    type = "input",
+                    name = "button5",
+                    order = 6,
+                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 5 end,
+                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[5] = val end,
+                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[5] end,
+                  },
+                  button6 = {
+                    type = "input",
+                    name = "button6",
+                    order = 7,
+                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 6 end,
+                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[6] = val end,
+                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[6] end,
+                  },
+                  button7 = {
+                    type = "input",
+                    name = "button7",
+                    order = 8,
+                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 7 end,
+                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[7] = val end,
+                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[7] end,
+                  },                      
               },      
-          },              
+          },
+          lootCouncilGroup = {
+            order =2,
+            type = "group",
+            guiInline = true,
+            name = "Loot Council",
+              args = {
+                  help = {
+                    order =0,
+                    type="description",
+                    name = "Allows the configuration of the members on council"
+                  
+                  },
+                  councilInput = {
+                    type = "input",
+                    name = "Loot Council Member",
+                    order = 1,
+                    width = "full",
+                    set = function(info, val) 
+                           -- get string convert to array store array
+                            -- { multple values } instantly creates an array with those values
+                            FusedCouncil.db.profile.options.lootCouncilMembers = {strsplit(",", val)};
+                            end,
+                    get  = function(info, val) 
+                           -- take stored array convert to string and return string
+                           local tempString = "";
+                           for i=1, #FusedCouncil.db.profile.options.lootCouncilMembers do
+                           if i == 1 then
+                              tempString = FusedCouncil.db.profile.options.lootCouncilMembers[i];
+                           else
+                              tempString = tempString .. "," .. FusedCouncil.db.profile.options.lootCouncilMembers[i];
+                           end
+                           
+                           end
+                           
+                           return tempString;
+                     end,
+                  },
+                  
+              },    
+          },
+          reset = {
+            type = "execute",
+            name = "reset defaults",
+            func = function() FusedCouncil.db:ResetProfile() end,
+            
+            
+          },
+                        
        },
     },
   },
 
 };
-
-function FusedCouncil:OnInitialize()
-  
-  --Set up frames
-  FusedCouncil_MainFrame = CreateMainFrame();
-  FusedCouncil_MinFrame = CreateMinFrame();
-  -- set DB for saving variables
-  self.db = LibStub("AceDB-3.0"):New("FusedCouncilDB");
-  
-
-end
-
-function FusedCouncil:OnEnable()
-  self:RegisterEvent("LOOT_OPENED", "LootOpenedHandeler");
-  self:RegisterComm(addonPrefix, "CoreCommHandler")
    -- LibStub("AceConfig-3.0"):RegisterOptionsTable("FusedCouncil", options, {"fcslash", "fcslashtwo"})
   local config = LibStub("AceConfig-3.0")
   config:RegisterOptionsTable("FusedCouncil Options", options)
@@ -97,7 +246,10 @@ function FusedCouncil:OnEnable()
 end
 
 function FusedCouncil:OnDisable()
-
+  self.db.profile.currentItem = currentItem;
+  self.db.profile.personSelected = personSelected;
+  self.db.profile.itemsToBeLooted = itemsToBeLooted;
+  self.db.profile.itemsLooted = itemsLooted;
 end
 
 function FusedCouncil:LootOpenedHandeler()
@@ -127,20 +279,43 @@ function FusedCouncil:Test(itemTable)
       end
       if #itemLinks > 0 then
       local data = FusedCouncil:Serialize(itemLinks) -- itemLinks is a table of item links
-      FusedCouncil:SendCommMessage(addonPrefix, "lootTable " ..data , "RAID");
+      local optionsData = FusedCouncil:Serialize(FusedCouncil.db.profile.options);
+      FusedCouncil:SendCommMessage(addonPrefix, "lootTable " ..data .." " .. optionsData, "RAID");
     
      FusedCouncil_Update();
       end
 end -- end Test
  
-
+function playerInCouncil(options)
+for i=1, #options.lootCouncilMembers do
+  if options.lootCouncilMembers[i] == UnitName("player") then
+    print("im on council")
+    return true;
+  end
+end
+  print("im not on council " .. UnitName("player"))
+  return false;
+end
 function FusedCouncil:CoreCommHandler(prefix, message, distribution, sender)
  if prefix == addonPrefix then
-  local cmd, data = strsplit(" ", message, 2);
+  local cmd, data, optionsTable = strsplit(" ", message, 3);
   local success, responseObject = FusedCouncil:Deserialize(data)
  
   if success then
-    if cmd == "addResponse" then
+    if cmd == "lootTable" then
+    print("i got loot table")
+      local success, options = LootModule:Deserialize(optionsTable);
+      if success then
+      print("it was successful")
+      if playerInCouncil(options) and not isMasterLooter then
+          print("should be adding")
+          for i=1, #responseObject do
+            AddItem(Item:new(responseObject[i]));
+          end
+          FusedCouncil_Update();
+        end 
+      end
+    elseif cmd == "addResponse" then
       local newResponse = Response:new(responseObject);
       FC_FindItem(newResponse:getItemLink()):addResponse(newResponse);
       
@@ -193,7 +368,7 @@ function SetCurrentItem(item)
      currentItemFrame = FC_GetFreeItemFrame(item);
      currentItemFrame:SetPoint("TopLeft", FusedCouncil_MainFrame, 50, -50);
      currentItemFontString:SetText(currentItem:getItemLink());
-   FusedCouncil_Update();  
+--   FusedCouncil_Update();  
   
 end -- end SetCurrentItem
 function ClearForNextUse()
@@ -216,6 +391,13 @@ function ClearForNextUse()
  end
  personSelected = "";
  FusedCouncil_MainFrame:Hide();
+  FusedCouncil.db.profile.currentItem = currentItem;
+  FusedCouncil.db.profile.personSelected = personSelected;
+  FusedCouncil.db.profile.itemsToBeLooted = itemsToBeLooted;
+  FusedCouncil.db.profile.itemsLooted = itemsLooted;
+end
+function addItemToLooted()
+
 end
 function FC_GiveItem()
   -- fix all this nonsense
@@ -263,18 +445,20 @@ function FusedCouncil_Update()
     end
     currentResponseFrames = {};
     -- repaint all the responses
-    for i=1, #currentItem:getResponseTable() do
-        FusedCouncil_AddResponse(currentItem:getResponseTable()[i]);
-        currentResponseFrames[i]:SetPoint("Top", 0, (-30*i) );
-        if personSelected == currentResponseFrames[i].subFrames[1].fontString:GetText() then
-          currentResponseFrames[i].texture:SetTexture(.9,.9,.1,.5);
-        else
-          currentResponseFrames[i].texture:SetTexture(.9,.9,.1,.1);
-        end
-        currentResponseFrames[i]:Show();
-    end
-
-
+      for i=1, #currentItem:getResponseTable() do
+          FusedCouncil_AddResponse(currentItem:getResponseTable()[i]);
+          currentResponseFrames[i]:SetPoint("Top", 0, (-30*i) );
+          if personSelected == currentResponseFrames[i].subFrames[1].fontString:GetText() then
+            currentResponseFrames[i].texture:SetTexture(.9,.9,.1,.5);
+          else
+            currentResponseFrames[i].texture:SetTexture(.9,.9,.1,.1);
+          end
+          currentResponseFrames[i]:Show();
+      end
+  FusedCouncil.db.profile.currentItem = currentItem;
+  FusedCouncil.db.profile.personSelected = personSelected;
+  FusedCouncil.db.profile.itemsToBeLooted = itemsToBeLooted;
+  FusedCouncil.db.profile.itemsLooted = itemsLooted;
 end
  
 function FC_FindItemIndex(itemTable, itemLink)
@@ -483,6 +667,7 @@ function FC_GetFreeItemFrame(item)
   
   tempItemFrame:SetScript("OnMouseDown", function()
     SetCurrentItem(item);
+    FusedCouncil_Update();
   end);
   
   return tempItemFrame;
