@@ -1,5 +1,4 @@
 FC_Utils ={
-print("these got read");
 nameCompare = function(response1, response2) 
  return response1:getPlayerName() > response2:getPlayerName();
 
