@@ -1,11 +1,10 @@
 Item = {}
 
-function Item:new(itemLink, count, responseTable)
+function Item:new(itemLink, responseTable)
   local newObject = {};
   setmetatable(newObject,self);
   self.__index = self;
   newObject.itemLink = itemLink or "";
-  newObject.count = count or 1;
   newObject.responseTable = responseTable or {};
   _ , _ , newObject.itemRarity, _ , _ , _ , _ ,_ ,newObject.ItemEquipLoc, newObject.itemTexture = GetItemInfo(itemLink);
 
@@ -65,10 +64,3 @@ function Item:getItemTexture()
   return self.itemTexture;
 end
 
-function Item:getCount()
-  return self.count;
-end
-
-function Item:setCount(count)
-  self.count = count;
-end

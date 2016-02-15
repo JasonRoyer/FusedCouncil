@@ -14,9 +14,9 @@ the table feilds are:
 
 
 ]]--
-local addon = LibStub("AceAddon-3.0"):GetAddon("FusedCouncil");
+local addon = LibStub("AceAddon-3.0"):GetAddon("fusedCouncil");
 -- LootModule = LibStub("AceAddon-3.0"):NewAddon("FusedCouncil_LootFrame","AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
-LootModule = addon:NewModule("FusedCouncil_LootFrame");
+LootModule = addon:NewModule("FusedCouncil_LootFrame","AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
 
 -- The main frame that contains the frames for responding
 FusedCouncil_LootFrame = {};

@@ -1,30 +1,35 @@
- 
- FusedCouncil = LibStub("AceAddon-3.0"):NewAddon("FusedCouncil","AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
-  FusedCouncil:SetDefaultModuleLibraries("AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
-  FusedCouncil:SetDefaultModuleState(true);
- FusedCouncil_MainFrame = {};
- FusedCouncil_MinFrame = {};
-local labelButtons = {};
-local currentItemFontString = {};
-local itemsToBeLooted = {};
-local itemsLooted = {};
-local currentItem;
-local currentItemFrame ={};
-local currentResponseFrames = {};
-local itemToBeLootedFrames = {};
+local fusedCouncil = LibStub("AceAddon-3.0"):NewAddon("fusedCouncil","AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
+
+-- GUI components
+local mainFrame;
+local minFrame;
+local itemsToBeLootedFrames= {};
 local itemsLootedFrames = {};
-local addonPrefix = "FusedCouncil";
-local personSelected = "";
-local isMasterLooter = false;
-local isTesting = false;
-local fakePeople = {"bob","steve","jason","Ajohny"}
-local defaults = {
+local currentResponseFrames = {};
+local currentItemFrame = {};
+local currentItemFontString = {};
+
+-- Engine components
+local currentItem;
+local personSelected;
+local itemsToBeLooted;
+local itemsLooted;
+local lootMethod;
+local isMasterLooter;
+local isCurrentlyLooting;
+local currentLootWindowItems;
+local addonPrefix = "FLCPREFIX";
+local isTesting;
+local dbProfile;
+local dbDefaults = {
+ 
   profile = {
     options = {
-      numButtons = 7,
-      responseNames = {"Bis", "Major","Minor", "Reroll", "OffSpec", "Transmog", "Pass"},
+      numOfResponseButtons = 7,
+      responseButtonNames = {"Bis", "Major","Minor", "Reroll", "OffSpec", "Transmog", "Pass"},
       lootCouncilMembers = {UnitName("player")},
     },
+    initializeFromDB = false,
     currentItem = nil,
     personSelected = "",
     itemsToBeLooted = {},
@@ -33,457 +38,113 @@ local defaults = {
 
 };
 
-
-function FusedCouncil:OnInitialize()
-  
-  --Set up frames
-  FusedCouncil_MainFrame = CreateMainFrame();
-  FusedCouncil_MinFrame = CreateMinFrame();
-  -- set DB for saving variables
-  self.db = LibStub("AceDB-3.0"):New("FusedCouncilDB",defaults, true);
-  self.db:RegisterDefaults(defaults);
-  if self.db.profile.currentItem ~= nil then
-  print("its diz many " .. #self.db.profile.itemsLooted)
-    local currentItemResponseTable = {};
-    for i=1, #self.db.profile.currentItem.responseTable do
-      table.insert(currentItemResponseTable, Response:new(self.db.profile.currentItem.responseTable[i]));
-    end
-    SetCurrentItem(Item:new(self.db.profile.currentItem.itemLink,currentItemResponseTable));
-    if self.db.profile.personSelected ~= "" then
-      personSelected = self.db.profile.personSelected;
-    end
+-- Engine methods
+local function update()
     
-    if #self.db.profile.itemsToBeLooted ~= 0 then
-      for i=1, #self.db.profile.itemsToBeLooted do
-        local tempItemResponseTable = {};
-        for k=1, #self.db.profile.itemsToBeLooted[i].responseTable do
-          table.insert(tempItemResponseTable, Response:new(self.db.profile.itemsToBeLooted[i].responseTable[k]));
-        end
-        AddItem(Item:new(self.db.profile.itemsToBeLooted[i].itemLink, tempItemResponseTable));
-      end
-    end
-    if #self.db.profile.itemsLooted ~= 0 then
-      for i=1, #self.db.profile.itemsLooted do
-        local tempItemResponseTable = {};
-        for k=1, #self.db.profile.itemsLooted[i].responseTable do
-          table.insert(tempItemResponseTable, Response:new(self.db.profile.itemsLooted[i].responseTable[k]));
-        end
-        local tempItem = Item:new(self.db.profile.itemsLooted[i].itemLink, tempItemResponseTable);
-        table.insert(itemsLooted, tempItem);
-        local tempFrame = FC_GetFreeItemFrame(tempItem);
-        tempFrame.highlightFrame:Show();
-        table.insert(itemsLootedFrames, tempFrame);
-      end
-    end
-    FusedCouncil_Update();
-   end
-end
-
-function FusedCouncil:OnEnable()
-  self:RegisterEvent("LOOT_OPENED", "LootOpenedHandeler");
-  self:RegisterComm(addonPrefix, "CoreCommHandler")
-  if select(2, GetLootMethod()) == 0 then
-    print("i am master looter")
-    isMasterLooter = true;
-  end 
-  local options = {
-  name ="FusedCouncil",
-  type="group",
-  -- can have set and get defined to get from DB
-  args = {
-    global = {
-       order =1,
-       name = "General config",
-       type ="group",
-       
-       args = {
-          help = {
-             order=0,
-             type = "description",
-             name = "FusedCouncil is an in game loot distribution system."
-          
-          },
-          
-          buttons = {
-            order =1,
-            type = "group",
-            guiInline = true,
-            name = "Response Buttons",
-              args = {
-                  help = {
-                    order =0,
-                    type="description",
-                    name = "Allows the configuration of response buttons"
-                  
-                  },
-                  numButtons = {
-                      type = "range",
-                    width = 'full',
-                      order = 1,
-                      name = "Amount of buttons to display:",
-                      min = 1,
-                      max = 7,
-                      step = 1,
-                      set = function(info, val)  FusedCouncil.db.profile.options.numButtons = val end,
-                      get = function(info) return FusedCouncil.db.profile.options.numButtons end,
-                  },
-                  button1 = {
-                    type = "input",
-                    name = "button1",
-
-                    order = 2,
-                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[1] = val end,
-                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[1] end,
-                  },
-                  button2 = {
-                    type = "input",
-                    name = "button2",
-                    order = 3,
-                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 2 end,
-                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[2] = val end,
-                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[2] end,
-
-                  },
-                  button3 = {
-                    type = "input",
-                    name = "button3",
-
-                    order = 4,
-                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 3 end,
-                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[3] = val end,
-                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[3] end,
-
-                  },
-                  button4 = {
-                    type = "input",
-                    name = "button4",
-
-                    order = 5,
-                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 4 end,
-                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[4] = val end,
-                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[4] end,
-                  },  
-                  button5 = {
-                    type = "input",
-                    name = "button5",
-                    order = 6,
-                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 5 end,
-                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[5] = val end,
-                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[5] end,
-                  },
-                  button6 = {
-                    type = "input",
-                    name = "button6",
-                    order = 7,
-                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 6 end,
-                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[6] = val end,
-                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[6] end,
-                  },
-                  button7 = {
-                    type = "input",
-                    name = "button7",
-                    order = 8,
-                    hidden = function () return FusedCouncil.db.profile.options.numButtons < 7 end,
-                    set = function(info, val) FusedCouncil.db.profile.options.responseNames[7] = val end,
-                    get  = function(info, val) return FusedCouncil.db.profile.options.responseNames[7] end,
-                  },                      
-              },      
-          },
-          lootCouncilGroup = {
-            order =2,
-            type = "group",
-            guiInline = true,
-            name = "Loot Council",
-              args = {
-                  help = {
-                    order =0,
-                    type="description",
-                    name = "Allows the configuration of the members on council"
-                  
-                  },
-                  councilInput = {
-                    type = "input",
-                    name = "Loot Council Member",
-                    order = 1,
-                    width = "full",
-                    set = function(info, val) 
-                           -- get string convert to array store array
-                            -- { multple values } instantly creates an array with those values
-                            FusedCouncil.db.profile.options.lootCouncilMembers = {strsplit(",", val)};
-                            end,
-                    get  = function(info, val) 
-                           -- take stored array convert to string and return string
-                           local tempString = "";
-                           for i=1, #FusedCouncil.db.profile.options.lootCouncilMembers do
-                           if i == 1 then
-                              tempString = FusedCouncil.db.profile.options.lootCouncilMembers[i];
-                           else
-                              tempString = tempString .. "," .. FusedCouncil.db.profile.options.lootCouncilMembers[i];
-                           end
-                           
-                           end
-                           
-                           return tempString;
-                     end,
-                  },
-                  
-              },    
-          },
-          reset = {
-            type = "execute",
-            name = "reset defaults",
-            func = function() FusedCouncil.db:ResetProfile() end,
-            
-            
-          },
-                        
-       },
-    },
-  },
-
-};
-   -- LibStub("AceConfig-3.0"):RegisterOptionsTable("FusedCouncil", options, {"fcslash", "fcslashtwo"})
-  local config = LibStub("AceConfig-3.0")
-  config:RegisterOptionsTable("FusedCouncil Options", options)
-
-  local dialog = LibStub("AceConfigDialog-3.0")
-  dialog:AddToBlizOptions("FusedCouncil Options", "FusedCouncil", nil, 'global')
-end
-
-function FusedCouncil:OnDisable()
-  self.db.profile.currentItem = currentItem;
-  self.db.profile.personSelected = personSelected;
-  self.db.profile.itemsToBeLooted = itemsToBeLooted;
-  self.db.profile.itemsLooted = itemsLooted;
-end
-
-function FusedCouncil:LootOpenedHandeler()
-  local itemLinks = {};
-      for i=1, GetNumLootItems() do
-        local lootLink = GetLootSlotLink(i) ;
-
-        table.insert(itemLinks, lootLink); 
-        AddItem(Item:new(lootLink));
-      end
-      
-      if #itemLinks > 0 then
-      local data = FusedCouncil:Serialize(itemLinks) -- itemLinks is a table of item links
-      FusedCouncil:SendCommMessage(addonPrefix, "lootTable " .. data, "RAID");
-
-      FusedCouncil_Update();
-      end
-end -- end LootOpenedHandeler
-
-function FusedCouncil:Test(itemTable)
-    isTesting = true;
-    local itemLinks = {};
-      for i=1, #itemTable do
-        local lootLink = itemTable[i] ;
-        table.insert(itemLinks, lootLink); 
-        AddItem(Item:new(lootLink));
-      end
-      if #itemLinks > 0 then
-      local data = FusedCouncil:Serialize(itemLinks) -- itemLinks is a table of item links
-      local optionsData = FusedCouncil:Serialize(FusedCouncil.db.profile.options);
-      FusedCouncil:SendCommMessage(addonPrefix, "lootTable " ..data .." " .. optionsData, "RAID");
-    
-     FusedCouncil_Update();
-      end
-end -- end Test
- 
-function playerInCouncil(options)
-for i=1, #options.lootCouncilMembers do
-  if options.lootCouncilMembers[i] == UnitName("player") then
-    print("im on council")
-    return true;
-  end
-end
-  print("im not on council " .. UnitName("player"))
-  return false;
-end
-function FusedCouncil:CoreCommHandler(prefix, message, distribution, sender)
- if prefix == addonPrefix then
-  local cmd, data, optionsTable = strsplit(" ", message, 3);
-  local success, responseObject = FusedCouncil:Deserialize(data)
- 
-  if success then
-    if cmd == "lootTable" then
-    print("i got loot table")
-      local success, options = LootModule:Deserialize(optionsTable);
-      if success then
-      print("it was successful")
-      if playerInCouncil(options) and not isMasterLooter then
-          print("should be adding")
-          for i=1, #responseObject do
-            AddItem(Item:new(responseObject[i]));
-          end
-          FusedCouncil_Update();
-        end 
-      end
-    elseif cmd == "addResponse" then
-      local newResponse = Response:new(responseObject);
-      FC_FindItem(newResponse:getItemLink()):addResponse(newResponse);
-      
-      for i=1,#fakePeople do
-      newResponse = Response:new(responseObject.itemLink, fakePeople[i], responseObject.playerIlvl - i, 0,responseObject.playerGuildRank, responseObject.playerResponse, i, responseObject.playerItem, nil );
-      FC_FindItem(newResponse:getItemLink()):addResponse(newResponse);
-      end
-
-      
-      FusedCouncil_Update();
-    elseif cmd == "vote" then
-      print("voting")
-      local newResponse = Response:new(responseObject);
-      local item = FC_FindItem(newResponse:getItemLink());
-      item:getResponseFromTable(newResponse:getPlayerName()):addVote(sender);
-      FusedCouncil_Update();
-    elseif cmd == "unvote" then
-      print("unvoting")
-      local newResponse = Response:new(responseObject);
-      local item = FC_FindItem(newResponse:getItemLink());
-      item:getResponseFromTable(newResponse:getPlayerName()):removeVote(sender);
-      FusedCouncil_Update();
-    end
-  else
-    print("Deserialization unsuccessful")
-  end
-  end
-end -- end CoreCommHandler
-
-function AddItem(item)
-  table.insert(itemsToBeLooted, item);
-  table.insert(itemToBeLootedFrames, FC_GetFreeItemFrame(item));
-  
-  if currentItem == nil then
-     SetCurrentItem(item);
-  end
-end
-
-
-function SetCurrentItem(item)
- if currentItem ~= nil then
-    ReleaseItemFrame(currentItemFrame);
-    for i=1, #currentResponseFrames do
-      ReleaseResponseFrame(currentResponseFrames[i]);
-      currentResponseFrames[i] = nil;
-    end
-    personSelected = "";
- end
-     currentItem = item;
-     currentItemFrame = FC_GetFreeItemFrame(item);
-     currentItemFrame:SetPoint("TopLeft", FusedCouncil_MainFrame, 50, -50);
-     currentItemFontString:SetText(currentItem:getItemLink());
---   FusedCouncil_Update();  
-  
-end -- end SetCurrentItem
-function ClearForNextUse()
- currentItemFontString = {};
- itemsToBeLooted = {};
- itemsLooted = {};
- currentItem = nil;
- currentItemFrame ={};
-  for i=1, #currentResponseFrames do
-  ReleaseResponseFrame(table.remove(currentResponseFrames, 1));
- end
- for i=1, #currentResponseFrames do
- 
- end
- for i=1, #itemToBeLootedFrames do
-  ReleaseItemFrame(table.remove(itemToBeLootedFrames, 1));
- end
-  for i=1, #itemsLootedFrames do
-  ReleaseItemFrame(table.remove(itemsLootedFrames, 1));
- end
- personSelected = "";
- FusedCouncil_MainFrame:Hide();
-  FusedCouncil.db.profile.currentItem = currentItem;
-  FusedCouncil.db.profile.personSelected = personSelected;
-  FusedCouncil.db.profile.itemsToBeLooted = itemsToBeLooted;
-  FusedCouncil.db.profile.itemsLooted = itemsLooted;
-end
-function addItemToLooted()
-
-end
-function FC_GiveItem()
-  -- fix all this nonsense
-  -- does loot change if you loot 1 item then reopen it?
-  -- could proccess the loot after you open it again, aka look for item links
-  --getlootbyitemLink() function?
-  if personSelected ~= "" and FC_FindItemIndex(itemsToBeLooted, currentItem:getItemLink()) ~= -1 then
-    local index = FC_FindItemIndex(itemsToBeLooted, currentItem:getItemLink());
-    print(index)
-    local itemGiven = table.remove(itemsToBeLooted, index);
-    local itemGivenFrame = table.remove(itemToBeLootedFrames, index);
-    table.insert(itemsLooted, itemGiven);
-    itemGivenFrame.highlightFrame:Show();
-    table.insert(itemsLootedFrames, itemGivenFrame);
-    
-    
-    if #itemsToBeLooted == 0 then
-      ClearForNextUse();
-    else
-      SetCurrentItem(itemsToBeLooted[1]);
-      FusedCouncil_Update();
-    end
-    
-  end
-end
-function FusedCouncil_Update()
-
     -- repaint all of the items in items[]
-    if itemToBeLootedFrames ~= nil then
-      for i=1, #itemToBeLootedFrames do 
-        itemToBeLootedFrames[i]:SetPoint("TopLeft", FusedCouncil_MainFrame, 20 + 60 * (i-1), -430);
+    if itemsToBeLootedFrames ~= nil then
+      for i=1, #itemsToBeLootedFrames do 
+        itemsToBeLootedFrames[i]:SetPoint("TopLeft", mainFrame, 20 + 60 * (i-1), -430);
       end
       
     end
     
     if itemsLootedFrames ~= nil then
       for i=1, #itemsLootedFrames do 
-        itemsLootedFrames[i]:SetPoint("TopLeft", FusedCouncil_MainFrame, 20 + 60 * (#itemToBeLootedFrames + i-1), -430);
+        itemsLootedFrames[i]:SetPoint("TopLeft", mainFrame, 20 + 60 * (#itemsToBeLootedFrames + i-1), -430);
       end
       
     end
     -- free current responses
     for i=1, #currentResponseFrames do
-        ReleaseResponseFrame(currentResponseFrames[i]);
+        releaseResponseFrame(currentResponseFrames[i]);
     end
     currentResponseFrames = {};
     -- repaint all the responses
       for i=1, #currentItem:getResponseTable() do
-          FusedCouncil_AddResponse(currentItem:getResponseTable()[i]);
+          addResponseFrame(currentItem:getResponseTable()[i]);
           currentResponseFrames[i]:SetPoint("Top", 0, (-30*i) );
-          if personSelected == currentResponseFrames[i].subFrames[1].fontString:GetText() then
+          if personSelected == currentItem:getResponseTable()[i]:getPlayerName() then
             currentResponseFrames[i].texture:SetTexture(.9,.9,.1,.5);
           else
             currentResponseFrames[i].texture:SetTexture(.9,.9,.1,.1);
           end
           currentResponseFrames[i]:Show();
       end
-  FusedCouncil.db.profile.currentItem = currentItem;
-  FusedCouncil.db.profile.personSelected = personSelected;
-  FusedCouncil.db.profile.itemsToBeLooted = itemsToBeLooted;
-  FusedCouncil.db.profile.itemsLooted = itemsLooted;
-end
- 
-function FC_FindItemIndex(itemTable, itemLink)
-  for i=1, #itemTable do
-    if itemTable[i]:getItemLink() == itemLink then
-      return i;
-    end
-  end
-  return -1;
-end
-function FC_FindItem(itemLink)
-  for i=1, #itemsToBeLooted do
-    if itemsToBeLooted[i]:getItemLink() == itemLink then
-      return itemsToBeLooted[i];
-    end
-  end
-  return nil;
+  dbProfile.currentItem = currentItem;
+  dbProfile.personSelected = personSelected;
+  dbProfile.itemsToBeLooted = itemsToBeLooted;
+  dbProfile.itemsLooted = itemsLooted;
 end
 
-function FC_Sort(table, sortFunction)
+local function initializeFromDB()
+  if dbProfile.currentItem ~= nil then
+    local responseTable = {};
+    for i=1, #dbProfile.currentItem.responseTable do
+      table.insert(responseTable, Response:new(dbProfile.currentItem.responseTable[i]));
+    end
+    SetCurrentItem(Item:new(dbProfile.currentItem.itemLink,responseTable));
+  end 
+  
+  if dbProfile.personSelected ~= "" then
+    personSelected = dbProfile.personSelected;
+  end
+  
+  if #dbProfile.itemsToBeLooted ~= 0 then
+      for i=1, #dbProfile.itemsToBeLooted do
+        local responseTable = {};
+        for k=1, #dbProfile.itemsToBeLooted[i].responseTable do
+          table.insert(responseTable, Response:new(dbProfile.itemsToBeLooted[i].responseTable[k]));
+        end
+        AddItem(Item:new(dbProfile.itemsToBeLooted[i].itemLink, responseTable));
+      end
+  end
+  
+  if #dbProfile.itemsLooted ~= 0 then
+    for i=1, #dbProfile.itemsLooted do
+      local responseTable = {};
+      for k=1, #dbProfile.itemsLooted[i].responseTable do
+        table.insert(responseTable, Response:new(dbProfile.itemsLooted[i].responseTable[k]));
+      end
+      local tempItem = Item:new(dbProfile.itemsLooted[i].itemLink, responseTable);
+      table.insert(itemsLooted, tempItem);
+      local tempFrame = FC_GetFreeItemFrame(tempItem);
+      tempFrame.highlightFrame:Show();
+      table.insert(itemsLootedFrames, tempFrame);
+    end
+  end
+end -- end initializeFromDB
+local function setCurrentItem(item)
+  if currentItem ~= nil then
+      releaseItemFrame(currentItemFrame);
+      for i=1, #currentResponseFrames do
+        releaseResponseFrame(currentResponseFrames[i]);
+        currentResponseFrames[i] = nil;
+      end
+      personSelected ="";
+  end -- end currentItem reset
+  
+  currentItem = item;
+  currentItemFrame = getFreeItemFrame(item);
+  currentItemFrame:SetPoint("TopLeft", mainFrame, 50, -50);
+  currentItemFontString:SetText(currentItem:getItemLink());
+
+end
+local function addItem(item)
+  local itemFound = findItem(item:getItemLink());
+  if itemFound == nil then
+      table.insert(itemsToBeLooted, item);
+      table.insert(itemsToBeLootedFrames, getFreeItemFrame(item));
+      
+      if currentItem == nil then
+         setCurrentItem(item);
+      end
+  else
+      itemFound:setCount(itemFound:getCount() + 1);
+  end
+end
+
+local function sort(table, sortFunction)
     -- if the table is alreaded sorted isSorted will stay true
     local isSorted = true;
     for i=1, #table-1 do
@@ -506,14 +167,73 @@ function FC_Sort(table, sortFunction)
     end
 
 end
--------------------------------------------
--------     CREATE FRAMES SECTION ---------
--------------------------------------------
+local function findItemIndex(table, itemLink)
+
+end
+
+local function findLootCanadaiteIndex(player)
+
+end
+
+local function itemGivenHandler(item)
+  local itemIndex = findItemIndex(itemsToBeLooted, item:getItemLink());
+      -- handle the gui shit
+      if itemsToBeLooted[itemIndex]:getCount() > 1 then
+         itemsToBeLooted[itemIndex]:setCount(itemsToBeLooted[itemIndex]:getCount() + 1);
+      else
+          local itemGiven = table.remove(itemsToBeLooted, itemIndex);
+          local itemGivenFrame = table.remove(itemsToBeLootedFrames, itemIndex);
+      end
+      
+      local givenItemIndex = findItemIndex(itemsLooted, item:getItemLink());
+      
+      if givenItemIndex ~= -1 then
+          itemsLooted[givenItemIndex]:setCount(itemsLooted[givenItemIndex]:getCount() + 1);
+      else
+          local newItem = Item:new(item:getItemLink(), 1, item:getResponseTable());
+          table.insert(itemsLooted, newItem);
+          table.insert(itemsLootedFrames, getFreeItemFrame(newItem));
+      end
+
+end
+local function giveItem(item)
+  local itemIndex = findItemIndex(itemsToBeLooted, currentItem:getItemLink());
+  if personSelected ~= "" and itemIndex ~= -1 then
+      -- actually give item
+      if isMasterLooter then
+        if isCurrentlyLooting or isTesting then
+          local canadaiteIndex = findLootCanadaiteIndex(personSelected);
+          if canadaiteIndex ~= -1 or isTesting then
+            if not isTesting then
+               GiveMasterLoot(findItemIndex(currentLootWindowItems,item:getItemLink()), canadaiteIndex);
+            end
+            itemGivenHandler(currentItem);
+            fusedCouncil:SendCommMessage(addonPrefix, "itemLooted ".. fusedCouncil:Serialize({itemLink = item:getItemLink()}), "RAID");
+          else
+            print("That Player is not elegiable for this loot");
+          end
+        else
+            print("you need to be looting the body");
+        end
+      end
+  
+  end
+
+end
+local function test(itemTable)
+  isTesting = true;
+  for i=1, #itemTable do
+    addItem(Item:new(itemTable[i]));
+  end
+  local payload = {};
+end
+-- Frame methods
 
 local itemFramePool = {};
 local responseFramePool = {};
-function CreateMainFrame()
-  local tempFrame = CreateFrame("Frame", nil,  UIParent, "PortraitFrameTemplate");
+
+local function createMainFrame()
+local tempFrame = CreateFrame("Frame", nil,  UIParent, "PortraitFrameTemplate");
   tempFrame:SetPoint("CENTER", UIParent, "CENTER");
   tempFrame:SetSize(900,425);
   tempFrame:SetMovable(true);
@@ -543,8 +263,8 @@ function CreateMainFrame()
   minButton:SetPoint("TopRight",tempFrame, -23, 1);
 
   minButton:SetScript("OnMouseup", function()
-    FusedCouncil_MainFrame:Hide();
-    FusedCouncil_MinFrame:Show();
+    mainFrame:Hide();
+    minFrame:Show();
   end );
   
     -- create reponse table attributes
@@ -552,30 +272,30 @@ function CreateMainFrame()
   local labelsNames = {"Name","ilvl","Score", "Current Item", "Rank", "Response", "Note", "Vote", "Votes"}
 
   for i=1 , #labelsNames do
-    labelButtons[i] = CreateFrame("Button", labelsNames[i].."LabelButton", tempFrame, "MagicButtonTemplate" );
-    labelButtons[i]:SetText(labelsNames[i]);
-    labelButtons[i]:SetPoint("TopLeft",tempFrame, 20+ (90*(i-1)), -100);
-    labelButtons[i]:SetScript("OnMouseDown", function()  
+    local tempButton = CreateFrame("Button", labelsNames[i].."LabelButton", tempFrame, "MagicButtonTemplate" );
+    tempButton:SetText(labelsNames[i]);
+    tempButton:SetPoint("TopLeft",tempFrame, 20+ (90*(i-1)), -100);
+    tempButton:SetScript("OnMouseDown", function()  
        if currentItem ~= nil then
           if i == 1 then
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.nameCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.nameCompare);
           elseif i==2 then
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.ilvlCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.ilvlCompare);
           elseif i ==3 then
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.scoreCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.scoreCompare);
           elseif i==4 then
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.itemCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.itemCompare);
           elseif i==5 then
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.rankCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.rankCompare);
           elseif i==6 then
           
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.responseCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.responseCompare);
           elseif i==7 then
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.noteCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.noteCompare);
           elseif i==9 then
-          FC_Sort(currentItem:getResponseTable(), FC_Utils.votesCompare);
+          sort(currentItem:getResponseTable(), FC_Utils.votesCompare);
           end
-          FusedCouncil_Update();
+          update();
        end
     
     end);
@@ -587,7 +307,7 @@ function CreateMainFrame()
   
   giveButton:SetScript("OnMouseup", function()
 
-    FC_GiveItem();
+    giveItem(currentItem);
   end );
 
   tempFrame:CreateTexture("ItemFrameTexture");
@@ -618,14 +338,15 @@ function CreateMainFrame()
 
 
 return tempFrame;
-end -- end CreateMainFrame
+end
 
-function CreateMinFrame()
+
+local function createMinFrame()
 
   -- Create a window for when we minimize the main window
   local minFrame = CreateFrame("Frame", "lcMinFrame",  UIParent, "PortraitFrameTemplate");
   -- create easier name to deal with
-  minFrame:SetPoint("TopRight", FusedCouncil_MainFrame, "TopRight");
+  minFrame:SetPoint("TopRight", mainFrame, "TopRight");
   minFrame:SetSize(100,75);
   minFrame:Hide();
 
@@ -638,8 +359,8 @@ function CreateMinFrame()
   maxButton:SetPoint("TopRight",minFrame, -23, 1);
 
   maxButton:SetScript("OnMouseup", function()
-    FusedCouncil_MinFrame:Hide();
-    FusedCouncil_MainFrame:Show();
+    minFrame:Hide();
+    mainFrame:Show();
   end );
 
   -- Create portrait icon for minWindow
@@ -648,49 +369,10 @@ function CreateMinFrame()
   minillidanTexture:SetPoint("TopLeft", -10, 10);
   
   return minFrame;
-end -- end CreateMinFrame
+end
 
-function FC_GetFreeItemFrame(item)
-  if #itemFramePool == 0 then
-    for i=1,5 do
-      table.insert(itemFramePool,CreateItemFrame());
-    end
-
-  end
-  local tempItemFrame =  table.remove(itemFramePool, 1);
-  tempItemFrame.texture:SetTexture(item:getItemTexture());
-  tempItemFrame:Show();
-  tempItemFrame:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(tempItemFrame, "ANCHOR_RIGHT")
-    GameTooltip:SetHyperlink(item:getItemLink());
-    GameTooltip:Show()
-  end);
-
-  tempItemFrame:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-  end);
-  
-  tempItemFrame:SetScript("OnMouseDown", function()
-    SetCurrentItem(item);
-    FusedCouncil_Update();
-  end);
-  
-  return tempItemFrame;
-end -- end FC_GetFreeItemFrame
-function FC_GetFreeResponseFrame(response)
-  if #responseFramePool == 0 then
-    for i=1,5 do
-      table.insert(responseFramePool,CreateResponseFrame());
-    end
-
-  end
-  return table.remove(responseFramePool, 1);
-
-end -- end FC_GetFreeResponseFrame
-
-
-function CreateItemFrame()
-  local tempFrame = CreateFrame("Frame", nil, FusedCouncil_MainFrame);
+local function createItemFrame()
+  local tempFrame = CreateFrame("Frame", nil, mainFrame);
   tempFrame:SetSize(50,50);
   tempFrame.texture = tempFrame:CreateTexture(nil, "BACKGROUND");
   tempFrame.texture:SetAllPoints(tempFrame);
@@ -705,8 +387,8 @@ function CreateItemFrame()
 
   return tempFrame;
 end
-function CreateResponseFrame()
-  local tempFrame =  CreateFrame("Frame", nil,  FusedCouncil_MainFrame.childFrame);
+local function createResponseFrame()
+  local tempFrame =  CreateFrame("Frame", nil,  mainFrame.childFrame);
    tempFrame:SetSize(800,25);
   tempFrame:Hide();
   tempFrame:EnableMouse(true);
@@ -714,7 +396,7 @@ function CreateResponseFrame()
   tempFrame.texture:SetAllPoints(tempFrame);
   tempFrame:SetScript("OnMouseDown", function()
       personSelected = tempFrame.subFrames[1].fontString:GetText();
-      FusedCouncil_Update();
+      update();
   end );
   
   tempFrame.subFrames = {};
@@ -723,7 +405,6 @@ function CreateResponseFrame()
     tempFrame.subFrames[i] :SetSize(88,25);
     tempFrame.subFrames[i] :SetPoint("TopLeft",(90*(i-1)),0);
     tempcolor= tempFrame.subFrames[i] :CreateTexture(nil, "BACKGROUND");
- --   tempcolor:SetTexture(1-(.1*i),1-(.1*i),.1, .5);
     tempcolor:SetAllPoints(tempFrame.subFrames[i] );
     if i == 4 then
       tempFrame.subFrames[i].itemFrames = {};
@@ -762,7 +443,78 @@ function CreateResponseFrame()
  return tempFrame;
 end
 
-function FusedCouncil_SetupSubFrameFour(frame, responseObject)
+
+local function getFreeItemFrame(item)
+  if #itemFramePool == 0 then
+    for i=1,5 do
+      table.insert(itemFramePool,createItemFrame());
+    end
+
+  end
+  local tempItemFrame =  table.remove(itemFramePool, 1);
+  tempItemFrame.texture:SetTexture(item:getItemTexture());
+  tempItemFrame:Show();
+  tempItemFrame:SetScript("OnEnter", function()
+    GameTooltip:SetOwner(tempItemFrame, "ANCHOR_RIGHT")
+    GameTooltip:SetHyperlink(item:getItemLink());
+    GameTooltip:Show()
+  end);
+
+  tempItemFrame:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end);
+  
+  tempItemFrame:SetScript("OnMouseDown", function()
+    setCurrentItem(item);
+    update();
+  end);
+  
+  return tempItemFrame;
+end
+local function getFreeResponseFrame(response)
+  if #responseFramePool == 0 then
+    for i=1,5 do
+      table.insert(responseFramePool,createResponseFrame());
+    end
+
+  end
+  return table.remove(responseFramePool, 1);
+
+end
+
+local function releaseResponseFrame(frame)
+   frame:Hide();
+  for i=1,3 do
+    frame.subFrames[4].itemFrames[i]:Hide();
+  end
+  frame.subFrames[8].voteButton:SetText("Vote");
+  
+  table.insert(responseFramePool, frame);
+end
+local function releaseItemFrame(frame)
+  frame:Hide();
+  frame.highlightFrame:Hide();
+  table.insert(itemFramePool, frame);
+end
+
+local function addResponseFrame(responseObject)
+ local response = FC_GetFreeResponseFrame();
+  
+  response.subFrames[1].fontString:SetText(responseObject:getPlayerName());
+  response.subFrames[2].fontString:SetText(responseObject:getPlayerIlvl());
+  response.subFrames[3].fontString:SetText(responseObject:getPlayerScore());
+  setupSubFrameFour(response.subFrames[4], responseObject);
+  response.subFrames[5].fontString:SetText(responseObject:getPlayerGuildRank());
+  response.subFrames[6].fontString:SetText(responseObject:getPlayerResponse());
+  setupSubFrameSeven(response.subFrames[7], responseObject);
+  setupSubFrameEight(response.subFrames[8], responseObject);
+  response.subFrames[9].fontString:SetText(#responseObject:getVotes());
+
+  
+  table.insert(currentResponseFrames, response);
+end
+
+local function setupSubFrameFour(frame, responseObject)
   local numItemsEquip = #responseObject:getPlayerItem();
   if numItemsEquip > 0 and responseObject:getPlayerItem()[1] ~= "none" then
     if numItemsEquip == 1 then
@@ -795,7 +547,7 @@ function FusedCouncil_SetupSubFrameFour(frame, responseObject)
   end
 end -- end FusedCouncil_SetupSubFrameFour
 
-function FusedCouncil_SetupSubFrameSeven(frame, responseObject)
+local function setupSubFrameSeven(frame, responseObject)
 
   if responseObject:getNote() == "" then
   frame.noteFrame.texture:SetTexture("Interface\\CHATFRAME\\UI-ChatIcon-Chat-Disabled.blp");
@@ -813,7 +565,7 @@ function FusedCouncil_SetupSubFrameSeven(frame, responseObject)
   end);
 end -- end FusedCouncil_SetupSubFrameSeven
 
-function FusedCouncil_SetupSubFrameEight(frame,responseObject)
+local function setupSubFrameEight(frame,responseObject)
    local votes = responseObject:getVotes();
   for i=1, #votes do
       if votes[i] == UnitName("player") then
@@ -836,41 +588,271 @@ function FusedCouncil_SetupSubFrameEight(frame,responseObject)
  
 end
 
-function FusedCouncil_AddResponse(responseObject)
- local response = FC_GetFreeResponseFrame();
-  
-  response.subFrames[1].fontString:SetText(responseObject:getPlayerName());
-  response.subFrames[2].fontString:SetText(responseObject:getPlayerIlvl());
-  response.subFrames[3].fontString:SetText(responseObject:getPlayerScore());
-  FusedCouncil_SetupSubFrameFour(response.subFrames[4], responseObject);
-  response.subFrames[5].fontString:SetText(responseObject:getPlayerGuildRank());
-  response.subFrames[6].fontString:SetText(responseObject:getPlayerResponse());
-  FusedCouncil_SetupSubFrameSeven(response.subFrames[7], responseObject);
-  FusedCouncil_SetupSubFrameEight(response.subFrames[8], responseObject);
-  response.subFrames[9].fontString:SetText(#responseObject:getVotes());
 
+function fusedCouncil:OnInitialize()
+  -- set up GUI components
+  mainFrame = createMainFrame();
+  minFrame = createMinFrame();
   
-  table.insert(currentResponseFrames, response);
-end -- end  FusedCouncil_AddResponse
-
-function ReleaseItemFrame(frame)
-  frame:Hide();
-  frame.highlightFrame:Hide();
-  table.insert(itemFramePool, frame);
-end
-function ReleaseResponseFrame(frame)
-  frame:Hide();
-  for i=1,3 do
-    frame.subFrames[4].itemFrames[i]:Hide();
+  -- set up DB for saving variables
+  self.db = LibStub("AceDB-3.0"):New("FusedCouncilDB",dbDefaults, true);
+  self.db:RegisterDefaults(dbDefaults);
+  dbProfile = self.db.profile;
+  if self.db.initializeFromDB then
+    initializeFromDB();
+    update();
   end
-  frame.subFrames[8].voteButton:SetText("Vote");
   
-  table.insert(responseFramePool, frame);
+  
 end
 
-SLASH_FLC1 = "/flc"
-SlashCmdList["FLC"] = function() 
-  print("slash cammand")
-    FusedCouncil:Test({GetInventoryItemLink("player",1),GetInventoryItemLink("player",5)})
-  end
- 
+
+function fusedCouncil:OnEnable()
+  -- register events and addonPrefix for ace3 comm
+  self:RegisterEvent("LOOT_OPENED", "LootOpenedHandler");
+  self:RegisterComm(addonPrefix, "CommHandler");
+  self:RegisterChatCommand("flc", function(input) 
+     local args = {strsplit(" ", input)};
+        if args[1] ~= nil then
+            if args[1] == "options" then
+            
+            elseif args[1] == "help" then
+            
+            elseif args[1] == "test" then
+                test({GetInventoryItemLink("player",1),GetInventoryItemLink("player",5)});
+            else
+              print("Unrecognized cmd");
+            end
+        else
+          print("no cmd was entered");
+        end
+  -- options
+  -- help
+  -- test
+  
+  
+  
+  end);
+  -- see if this player is currently the ML
+  local lootMethodString, masterLooter = GetLootMethod();
+  lootMethod = lootMethodString;
+  
+  if masterLooter == 0 then
+    isMasterLooter = true;
+  else
+    isMasterLooter = false;
+  end 
+  -- register options
+  local options = {
+    name ="FusedCouncil",
+    type="group",
+    -- can have set and get defined to get from DB
+    args = {
+      global = {
+         order =1,
+         name = "General config",
+         type ="group",
+         
+         args = {
+            help = {
+               order=0,
+               type = "description",
+               name = "FusedCouncil is an in game loot distribution system."
+            
+            },
+            
+            buttons = {
+              order =1,
+              type = "group",
+              guiInline = true,
+              name = "Response Buttons",
+                args = {
+                    help = {
+                      order =0,
+                      type="description",
+                      name = "Allows the configuration of response buttons"
+                    
+                    },
+                    numButtons = {
+                        type = "range",
+                      width = 'full',
+                        order = 1,
+                        name = "Amount of buttons to display:",
+                        min = 1,
+                        max = 7,
+                        step = 1,
+                        set = function(info, val)  dbProfile.options.numOfResponseButtons = val end,
+                        get = function(info) return dbProfile.options.numOfResponseButtons end,
+                    },
+                    button1 = {
+                      type = "input",
+                      name = "button1",
+  
+                      order = 2,
+                      set = function(info, val) dbProfile.options.responseButtonNames[1] = val end,
+                      get  = function(info, val) return dbProfile.options.responseButtonNames[1] end,
+                    },
+                    button2 = {
+                      type = "input",
+                      name = "button2",
+                      order = 3,
+                      hidden = function () return dbProfile.options.numOfResponseButtons < 2 end,
+                      set = function(info, val) dbProfile.options.responseButtonNames[2] = val end,
+                      get  = function(info, val) return dbProfile.options.responseButtonNames[2] end,
+  
+                    },
+                    button3 = {
+                      type = "input",
+                      name = "button3",
+  
+                      order = 4,
+                      hidden = function () return dbProfile.options.numOfResponseButtons < 3 end,
+                      set = function(info, val) dbProfile.options.responseButtonNames[3] = val end,
+                      get  = function(info, val) return dbProfile.options.responseButtonNames[3] end,
+  
+                    },
+                    button4 = {
+                      type = "input",
+                      name = "button4",
+  
+                      order = 5,
+                      hidden = function () return dbProfile.options.numOfResponseButtons < 4 end,
+                      set = function(info, val) dbProfile.options.responseButtonNames[4] = val end,
+                      get  = function(info, val) return dbProfile.options.responseButtonNames[4] end,
+                    },  
+                    button5 = {
+                      type = "input",
+                      name = "button5",
+                      order = 6,
+                      hidden = function () return dbProfile.options.numOfResponseButtons < 5 end,
+                      set = function(info, val) dbProfile.options.responseButtonNames[5] = val end,
+                      get  = function(info, val) return dbProfile.options.responseButtonNames[5] end,
+                    },
+                    button6 = {
+                      type = "input",
+                      name = "button6",
+                      order = 7,
+                      hidden = function () return dbProfile.options.numOfResponseButtons < 6 end,
+                      set = function(info, val) dbProfile.options.responseButtonNames[6] = val end,
+                      get  = function(info, val) return dbProfile.options.responseButtonNames[6] end,
+                    },
+                    button7 = {
+                      type = "input",
+                      name = "button7",
+                      order = 8,
+                      hidden = function () return dbProfile.options.numOfResponseButtons < 7 end,
+                      set = function(info, val) dbProfile.options.responseButtonNames[7] = val end,
+                      get  = function(info, val) return dbProfile.options.responseButtonNames[7] end,
+                    },                      
+                },      
+            },
+            lootCouncilGroup = {
+              order =2,
+              type = "group",
+              guiInline = true,
+              name = "Loot Council",
+                args = {
+                    help = {
+                      order =0,
+                      type="description",
+                      name = "Allows the configuration of the members on council"
+                    
+                    },
+                    councilInput = {
+                      type = "input",
+                      name = "Loot Council Member",
+                      order = 1,
+                      width = "full",
+                      set = function(info, val) 
+                             -- get string convert to array store array
+                              -- { multple values } instantly creates an array with those values
+                              dbProfile.options.lootCouncilMembers = {strsplit(",", val)};
+                              end,
+                      get  = function(info, val) 
+                             -- take stored array convert to string and return string
+                             local tempString = "";
+                             for i=1, #dbProfile.options.lootCouncilMembers do
+                             if i == 1 then
+                                tempString = dbProfile.options.lootCouncilMembers[i];
+                             else
+                                tempString = tempString .. "," .. dbProfile.options.lootCouncilMembers[i];
+                             end
+                             
+                             end
+                             
+                             return tempString;
+                       end,
+                    },
+                    
+                },    
+            },
+            reset = {
+              type = "execute",
+              name = "reset defaults",
+              func = function() FusedCouncil.db:ResetProfile() end,
+              
+              
+            },
+                          
+         },
+      },
+    },
+  
+  };
+  
+  LibStub("AceConfig-3.0"):RegisterOptionsTable("FusedCouncil Options", options);
+  LibStub("AceConfigDialog-3.0"):AddToBlizOptions("FusedCouncil Options", "FusedCouncil", nil, 'global');
+end
+
+function fusedCouncil:OnDisable()
+
+end
+function fusedCouncil:CommHandler(prefix, message, distribution, sender)
+  if prefix == addonPrefix then
+     local cmd, serializedPayload = strsplit(" ", message, 2);
+     local success, payload = self:Deserialize(serializedPayload);
+     
+     if success then
+        if cmd == "lootTable" then
+            if payload.council[UnitName("player")]  ~= nil and not isMasterLooter then
+                for i=1, #payload.lootTable do
+                  local foundItem = findItem(payload.lootTable[i]);
+                  if foundItem ~= nil then
+                     foundItem:setCount(foundItem:getCount() + 1);
+                  else
+                     AddItem(Item:new(payload.lootTable[i]));
+                  end
+                 
+                end
+            end -- end if councilmember
+        elseif cmd == "itemResponse" then
+            local newResponse = Response:new(payload.itemResponse);
+            findItem(newResponse:getItemLink()):addResponse(newResponse);
+        elseif cmd == "vote" then
+            local item = findItem(payload.itemLink);
+            if item ~= nil then
+                item:getResponseFromTable(payload.player):addVote(sender);
+            end
+        elseif cmd =="unvote" then
+            local item = findItem(payload.itemLink);
+            if item ~= nil then
+                item:getResponseFromTable(payload.player):removeVote(sender);
+            end
+        elseif cmd == "itemLooted" then
+            local item = findItem(payload.itemLink);
+            if item ~= nil then
+                itemGivenHandler(item);
+            end
+        
+        end -- end cmd check
+        update();
+     else
+        print("Deserialization of payload in CommHandler failed")
+     end -- end success check
+  
+  end -- end prefix matched
+end
+function fusedCouncil:LootOpenedHandler()
+
+end
+
