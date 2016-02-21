@@ -240,7 +240,14 @@ function fusedCouncil:OnEnable()
                     
                 },    
             },
-            reset = {
+            resetDB = {
+              type = "execute",
+              name = "reset salved DB",
+              func = function() fusedCouncil:clearForNextUse(); end,
+              
+              
+            },
+            resetProfile = {
               type = "execute",
               name = "reset defaults",
               func = function() fusedCouncil.db:ResetProfile(); end,
@@ -301,6 +308,9 @@ function fusedCouncil:CommHandler(prefix, message, distribution, sender)
         elseif cmd == "itemLooted" then
             local item = fusedCouncil:findItem(itemsToBeLooted,payload.itemLink);
             if item ~= nil and not isMasterLooter then
+                
+                personSelected = payload.player;
+                print("personSelected now " .. payload.player)
                 fusedCouncil:itemGivenHandler(item);
             end
         
@@ -560,7 +570,7 @@ function fusedCouncil:itemGivenHandler(item)
     end
 end
 function fusedCouncil:clearForNextUse()
- currentItemFontString = {};
+ currentItemFontString:SetText("");
  itemsToBeLooted = {};
  itemsLooted = {};
  currentItem = nil;
@@ -596,8 +606,8 @@ function fusedCouncil:giveItem(item)
             if not isTesting then
                GiveMasterLoot(fusedCouncil:findItemIndex(currentLootWindowItems,item:getItemLink()), canadaiteIndex);
             end
+            fusedCouncil:SendCommMessage(addonPrefix, "itemLooted ".. fusedCouncil:Serialize({itemLink = item:getItemLink(), player = personSelected}), "RAID");
             fusedCouncil:itemGivenHandler(currentItem);
-            fusedCouncil:SendCommMessage(addonPrefix, "itemLooted ".. fusedCouncil:Serialize({itemLink = item:getItemLink()}), "RAID");
           else
             print("That Player is not elegiable for this loot");
           end
@@ -626,6 +636,7 @@ function fusedCouncil:createItemTable(itemLinkTable)
 end
 function fusedCouncil:test(itemTable)
   isTesting = true;
+   mainFrame:Show();
   local itemObjectTable = fusedCouncil:createItemTable(itemTable);
   for i=1, #itemObjectTable do
     fusedCouncil:addItem(itemObjectTable[i]);
