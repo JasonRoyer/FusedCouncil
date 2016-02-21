@@ -29,6 +29,7 @@ local dbDefaults = {
       responseButtonNames = {"Bis", "Major","Minor", "Reroll", "OffSpec", "Transmog", "Pass"},
       lootCouncilMembers = {UnitName("player")},
     },
+    isTesting = false,
     initializeFromDB = false,
     currentItem = nil,
     personSelected = "",
@@ -46,14 +47,14 @@ function fusedCouncil:OnInitialize()
   self.db = LibStub("AceDB-3.0"):New("FusedCouncilDB",dbDefaults, true);
   self.db:RegisterDefaults(dbDefaults);
   dbProfile = self.db.profile;
-  if self.db.initializeFromDB then
-    fusedCouncil:initializeFromDB();
-    fusedCouncil:update();
-  else
     currentItem = nil;
     personSelected = "";
     itemsLooted = {};
     itemsToBeLooted = {};
+  if dbProfile.initializeFromDB then
+    fusedCouncil:initializeFromDB();
+    fusedCouncil:update();
+
   end
   
   
@@ -377,7 +378,8 @@ function fusedCouncil:update()
   else
     currentItemFrame.itemCountFontString:SetText("");
   end
-      
+  dbProfile.isTesting = isTesting;
+  dbProfile.initializeFromDB = true;
   dbProfile.currentItem = currentItem;
   dbProfile.personSelected = personSelected;
   dbProfile.itemsToBeLooted = itemsToBeLooted;
@@ -385,12 +387,13 @@ function fusedCouncil:update()
 end
 
 function fusedCouncil:initializeFromDB()
+  isTesting = dbProfile.isTesting;
   if dbProfile.currentItem ~= nil then
     local responseTable = {};
     for i=1, #dbProfile.currentItem.responseTable do
       table.insert(responseTable, Response:new(dbProfile.currentItem.responseTable[i]));
     end
-    fusedCouncil:setCurrentItem(Item:new(dbProfile.currentItem.itemLink,responseTable));
+    fusedCouncil:setCurrentItem(Item:new(dbProfile.currentItem.itemLink,dbProfile.currentItem.count,responseTable, dbProfile.currentItem.given));
   end 
   
   if dbProfile.personSelected ~= "" then
@@ -403,7 +406,7 @@ function fusedCouncil:initializeFromDB()
         for k=1, #dbProfile.itemsToBeLooted[i].responseTable do
           table.insert(responseTable, Response:new(dbProfile.itemsToBeLooted[i].responseTable[k]));
         end
-        fusedCouncil:sddItem(Item:new(dbProfile.itemsToBeLooted[i].itemLink, responseTable));
+        fusedCouncil:addItem(Item:new(dbProfile.itemsToBeLooted[i].itemLink,dbProfile.itemsToBeLooted[i].count, responseTable, dbProfile.itemsToBeLooted[i].given));
       end
   end
   
@@ -413,7 +416,7 @@ function fusedCouncil:initializeFromDB()
       for k=1, #dbProfile.itemsLooted[i].responseTable do
         table.insert(responseTable, Response:new(dbProfile.itemsLooted[i].responseTable[k]));
       end
-      local tempItem = Item:new(dbProfile.itemsLooted[i].itemLink, responseTable);
+      local tempItem = Item:new(dbProfile.itemsLooted[i].itemLink,dbProfile.itemsLooted[i].count, responseTable, dbProfile.itemsLooted[i].given);
       table.insert(itemsLooted, tempItem);
       local tempFrame = fusedCouncil:getFreeItemFrame(tempItem);
       tempFrame.highlightFrame:Show();
