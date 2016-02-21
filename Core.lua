@@ -280,20 +280,23 @@ function fusedCouncil:CommHandler(prefix, message, distribution, sender)
                   end
                  
                 end
+                fusedCouncil:update();
             end -- end if councilmember
         elseif cmd == "itemResponse" then
-            print("got a response")
             local newResponse = Response:new(payload.itemResponse);
             fusedCouncil:findItem(itemsToBeLooted,newResponse:getItemLink()):addResponse(newResponse);
+            fusedCouncil:update();
         elseif cmd == "vote" then
             local item = fusedCouncil:findItem(itemsToBeLooted,payload.itemLink);
             if item ~= nil then
                 item:getResponseFromTable(payload.player):addVote(sender);
+                fusedCouncil:update();
             end
         elseif cmd =="unvote" then
             local item = fusedCouncil:findItem(itemsToBeLooted,payload.itemLink);
             if item ~= nil then
                 item:getResponseFromTable(payload.player):removeVote(sender);
+                fusedCouncil:update();
             end
         elseif cmd == "itemLooted" then
             local item = fusedCouncil:findItem(itemsToBeLooted,payload.itemLink);
@@ -302,7 +305,6 @@ function fusedCouncil:CommHandler(prefix, message, distribution, sender)
             end
         
         end -- end cmd check
-        fusedCouncil:update();
      else
         print("Deserialization of payload in CommHandler failed")
      end -- end success check
@@ -367,6 +369,10 @@ function fusedCouncil:update()
             currentResponseFrames[i].texture[1]:Show();
           end
           if #currentItem:givenTo() > 0 and FC_Utils.tableContains(currentItem:givenTo(), currentResponseFrames[i].subFrames[1].fontString:GetText())then
+            currentResponseFrames[i].texture[3]:Show();
+          end
+          local itemGivenAlready = fusedCouncil:findItem(itemsLooted, currentItem:getItemLink());
+          if itemGivenAlready ~= nil  and FC_Utils.tableContains(itemGivenAlready:givenTo(), currentResponseFrames[i].subFrames[1].fontString:GetText())then
             currentResponseFrames[i].texture[3]:Show();
           end
 
@@ -545,9 +551,39 @@ function fusedCouncil:itemGivenHandler(item)
           tempFrame.highlightFrame:Show();
           table.insert(itemsLootedFrames, tempFrame);
       end
+
     personSelected = "";
-      
+    if #itemsToBeLooted == 0 then
+      fusedCouncil:clearForNextUse();
+    else
     fusedCouncil:update();
+    end
+end
+function fusedCouncil:clearForNextUse()
+ currentItemFontString = {};
+ itemsToBeLooted = {};
+ itemsLooted = {};
+ currentItem = nil;
+ currentItemFrame ={};
+ isTesting = false;
+  for i=1, #currentResponseFrames do
+  fusedCouncil:releaseResponseFrame(table.remove(currentResponseFrames, 1));
+ end
+ for i=1, #itemsToBeLootedFrames do
+  fusedCouncil:releaseItemFrame(table.remove(itemsToBeLootedFrames, 1));
+ end
+  for i=1, #itemsLootedFrames do
+  fusedCouncil:releaseItemFrame(table.remove(itemsLootedFrames, 1));
+ end
+ personSelected = "";
+ mainFrame:Hide();
+ 
+  dbProfile.currentItem = currentItem;
+  dbProfile.personSelected = personSelected;
+  dbProfile.itemsToBeLooted = itemsToBeLooted;
+  dbProfile.itemsLooted = itemsLooted;
+  dbProfile.isTesting = false;
+  dbProfile.initializeFromDB = false;
 end
 function fusedCouncil:giveItem(item)
   local itemIndex = fusedCouncil:findItemIndex(itemsToBeLooted, currentItem:getItemLink());
@@ -979,7 +1015,7 @@ function fusedCouncil:setupSubFrameEight(frame,responseObject)
       end
   end
   frame.voteButton:SetScript("OnClick", function(self) 
-
+  if #currentItem:givenTo() == 0 then
       if self:GetText() == "Vote" then 
          if not currentItem:hasVoteFrom(UnitName("player")) then
         fusedCouncil:SendCommMessage(addonPrefix, "vote ".. fusedCouncil:Serialize({itemLink = responseObject:getItemLink(), player = responseObject:getPlayerName()}), "RAID");
@@ -987,7 +1023,7 @@ function fusedCouncil:setupSubFrameEight(frame,responseObject)
       elseif self:GetText() == "UnVote" then
         fusedCouncil:SendCommMessage(addonPrefix, "unvote ".. fusedCouncil:Serialize({itemLink = responseObject:getItemLink(), player = responseObject:getPlayerName()}), "RAID");
       end
-
+  end
   end);
  
 end
