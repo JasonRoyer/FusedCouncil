@@ -1,167 +1,82 @@
---[[
-  This page contains code for the pop up response window.
-A table of item links is passed via Ace3Comm lib and proccessed.
-Then a response is sent back as a table 
-the table feilds are:
-  link - the item link of the item to respond about
-  name - the name of the player responding
-  ilvl - the ilvl of the player responding
-  score - the score of the player responding (to be implemented later)
-  rank - the guild rank of the player responding
-  response - the response about the item IE pass, need ext...
-  note - a note writen by the player responding to the loot council
-  currentItem - the item the player responding currently has equiped
+local mainAddon = LibStub("AceAddon-3.0"):GetAddon("fusedCouncil");
 
+local lootModule = mainAddon:NewModule("FCLootFrame","AceComm-3.0", "AceSerializer-3.0","AceEvent-3.0","AceTimer-3.0");
 
-]]--
-local addon = LibStub("AceAddon-3.0"):GetAddon("fusedCouncil");
--- LootModule = LibStub("AceAddon-3.0"):NewAddon("FusedCouncil_LootFrame","AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
-LootModule = addon:NewModule("FusedCouncil_LootFrame","AceConsole-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "AceHook-3.0", "AceTimer-3.0");
-
--- The main frame that contains the frames for responding
-FusedCouncil_LootFrame = {};
--- A pool of frames that are used to generate the content within the main frame
-local responseFramePool = {};
--- a table of the current frames being used to show content on the main frame
+-- Gui components
+local lootFrame;
+local responseFramePool;
 local currentResponses = {};
-local itemTablex = {};
-local itemsFound = 0
-local checkAgain = {}
-local itemsFoundAgain = {};
-local optionsx = {};
-function LootModule:OnInitialize()
-  FusedCouncil_LootFrame = FC_CreateLootFrame();
+
+-- engine components
+local numItemsRecived;
+local options;
+local numItemsFound;
+local checkAgain;
+local itemsFoundtable;
+
+function lootModule:OnInitialize()
+    lootFrame = lootModule:createLootFrame();
+    responseFramePool = {};
+    numItemsFound = 0;
+    checkAgain ={};
+    currentResponses = {};
+    itemsFoundtable = {};
+end 
+
+function lootModule:OnEnable()
+    self:RegisterComm("FLCPREFIX")
 end
-
-
-
-function LootModule:OnEnable()
-  self:RegisterComm("FusedCouncil");
-end
-
 
 -- The function fired everytime the prefix is recived. More info under Ace3comm.
-function LootModule:OnCommReceived(prefix, message, distribution, sender)
- 
+function lootModule:OnCommReceived(prefix, message, distribution, sender)
     -- split the message into the camand and the serialized data(Ace3), strsplit is in the wow api.
-   local cmd, data, optionsTable = strsplit(" ", message, 3);
+   local cmd, serializedPayload = strsplit(" ", message, 2);
+   local success, payload = lootModule:Deserialize(serializedPayload);
+   if success then
    
-   if cmd == "lootTable" then
-      local success, options = LootModule:Deserialize(optionsTable);
-      
-      if success then
-        optionsx = options;
-
-        local success2, itemTable = LootModule:Deserialize(data);
-        if success2 then
-          itemTablex = itemTable;
-          for i = 1, #itemTable do
-            if GetItemInfo(itemTable[i]) ~= nil then
-               FC_AddResponse(itemTable[i]);
-            else 
-               table.insert(checkAgain, itemTable[i]);
-               FusedCouncil_LootFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED");
-           end
-          end
-        else
-           print("failed " .. itemTable);
-        end
-      else
-        print("failed " .. options);
+     if cmd == "lootTable" then
+     print("loottable cmd recived")
+      options = payload.optionsTable;
+      -- cannot send fuctions over addon msg so only data of the object is recived, make new object.
+      local itemData = payload.lootTable;
+      payload.lootTable = {};
+      for i=1, #itemData do
+        table.insert(payload.lootTable, Item:new(itemData[i]));
       end
-   
-   end
-   
-   
- 
+      numItemsRecived = #payload.lootTable;
+       
+       for i=1, #payload.lootTable do
+          if GetItemInfo(payload.lootTable[i]:getItemLink()) ~= nil then
+              lootModule:addResponse(payload.lootTable[i]);
+          else
+               table.insert(checkAgain, payload.lootTable[i]);
+               lootFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED");
+          end
+        end
+       
+       
+
+     end
+   else
+    print("Deserialization of payload failed");
+   end  
     
 end -- end LootCommHandler
 
-
-
-local function ReQuery()
-  for i=1, #checkAgain do
-      local itemName = GetItemInfo(checkAgain[i])
-    if itemName then
-      local itemFound = table.remove(checkAgain, i);
-      table.insert(itemsFoundAgain,itemFound );
-      itemsFound = itemsFound + 1
-    end
-  end
-  
-  if itemsFound == #itemTablex then  --if all of our items have been found by the client...
-
-    for i = 1, #itemsFoundAgain do
-          if GetItemInfo(itemsFoundAgain[i]) ~= nil then
-             FC_AddResponse(itemsFoundAgain[i]);
-         end
-    end 
-    FusedCouncil_LootFrame:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
-    itemsFound = 0;
-    itemsFoundAgain={};
-  end
-end
-
-function LootModule:OnDisable()
-
-end
-
-
---[[
-   Takes an empty responseFrame from the pool and fills in item information from the link provided.
-  The frame is the visual window for responding when sent an item. The frame contains a table with
-  fields relating to what is needed to respond(see top of class)
-  
-  @param  lootLink  an item link supplied by the wow api to identify an item.
-
-]]
-function FC_AddResponse(itemLink)
+function lootModule:addResponse(item)
+  print("adding response")
    local _, myIlvl = GetAverageItemLevel();
-  -- GetItemInfo will return nil if the player has not seen the item before, aka my lvl 10
-  local itemEquipSlot, itemTexture = select(9, GetItemInfo(itemLink));
-  local tempResponse = Response:new(itemLink, GetUnitName("player",false),math.floor(myIlvl+0.5),nil,select(2, GetGuildInfo("player")),nil,nil,FC_GetPlayersCurrentItem(itemLink));
+  local tempResponse = Response:new(item:getItemLink(), GetUnitName("player",false),math.floor(myIlvl+0.5),nil,select(2, GetGuildInfo("player")),nil,nil, lootModule:getPlayersCurrentItems(item:getItemLink()));
 
-  local tempResponseFrame = FC_GetResponseFrame(FusedCouncil_LootFrame);
-  tempResponseFrame.ResponseNum = #currentResponses+ 1;
+  local tempResponseFrame = lootModule:getResponseFrame(item, tempResponse);
   
-  for i=1, optionsx.numButtons do
-      tempResponseFrame.Buttons[i]:SetText(optionsx.responseNames[i]);
-      tempResponseFrame.Buttons[i]:Show();
-      tempResponseFrame.Buttons[i]:SetScript("OnClick", function(self)
-        tempResponse:setPlayerResponse(self:GetText());
-        tempResponse:setNote(tempResponseFrame.NoteBox:GetText());
-        RC_RemoveResponse(tempResponseFrame.ResponseNum);
-        LootModule:SendCommMessage( "FusedCouncil", "addResponse ".. LootModule:Serialize(tempResponse), "RAID" );
-     end);
-  end
-  
-  tempResponseFrame.IconFrame.Texture:SetTexture(itemTexture);
-
-  tempResponseFrame.IconFrame:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(tempResponseFrame.IconFrame, "ANCHOR_RIGHT")
-    GameTooltip:SetHyperlink(itemLink);
-    GameTooltip:Show()
-  end);
-
-  tempResponseFrame.IconFrame:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-  end);
-  tempResponseFrame.LootItemName:SetText(GetItemInfo(itemLink));
-
-  tempResponseFrame.response = tempResponse;
   table.insert(currentResponses, tempResponseFrame);
-  FC_Update();
+  print("i just inserted should be" .. #currentResponses)
+  lootModule:update();
   
-end -- end FC_AddResponse
+end
 
-
---[[
-  Return the item that is currently equpped in the slot that also goes with the itemLink provided.
-  
-  @Param itemLink
-  @return itemLink
-]]
-function FC_GetPlayersCurrentItem(itemLink)
+function lootModule:getPlayersCurrentItems(itemLink)
 
   local itemEquipSlot = select(9, GetItemInfo(itemLink));
 
@@ -206,59 +121,121 @@ function FC_GetPlayersCurrentItem(itemLink)
       end
   end
   return equipedItemLink;
-end -- end FC_GetPlayersCurrentItem
+end
 
-
-
-
-function RC_RemoveResponse(index)
-    FC_ReleaseResponseFrame(table.remove(currentResponses, index));
-    for i=index, #currentResponses do
-      currentResponses[i].ResponseNum = currentResponses[i].ResponseNum -1;
-    end
-    FC_Update();
-end -- end RC_RemoveResponse
-
-
-function FC_Update()
+function lootModule:update()
+  print("updating " .. #currentResponses)
   for i = 1, #currentResponses do
-    currentResponses[i]:SetPoint("TopLeft", FusedCouncil_LootFrame, 0, -100*(i-1));
+    currentResponses[i]:SetPoint("TopLeft", lootFrame, 0, -100*(i-1));
   end
 
   if #currentResponses == 0 then
-    FusedCouncil_LootFrame:Hide();
+    lootFrame:Hide();
   else
-    FusedCouncil_LootFrame:SetSize(900, 100*#currentResponses);
-    FusedCouncil_LootFrame:Show();
+    lootFrame:SetSize(900, 100*#currentResponses);
+    lootFrame:Show();
   end
-end -- end FC_Update
+end
 
-function FC_GetResponseFrame(parent)
-    if #responseFramePool == 0 then
+function lootModule:reQuery()
+  for i=1, #checkAgain do
+      local itemName = GetItemInfo(checkAgain[i])
+    if itemName then
+      local itemFound = table.remove(checkAgain, i);
+      table.insert(itemsFoundtable,itemFound );
+    end
+  end
+  
+  if #itemsFoundtable == numItemsRecived - #currentResponses then  --if all of our items have been found by the client...
+
+    for i = 1, #itemsFoundtable do
+          if GetItemInfo(itemsFoundtable[i]:getItemLink()) ~= nil then
+            lootModule:addResponse(itemsFoundtable[i]);
+         end
+    end 
+    lootFrame:UnregisterEvent("GET_ITEM_INFO_RECEIVED");
+    itemsFoundtable={};
+  end  
+  
+
+end
+-- FRAME methods
+function lootModule:createLootFrame()
+  
+  local frame = CreateFrame("Frame", nil, UIParent);
+  frame:SetFrameStrata("HIGH");
+  frame:Hide();
+  frame:SetPoint("CENTER", UIParent, "CENTER");
+  frame:SetSize(900,400);
+  frame:SetMovable(true);
+  frame:EnableMouse(true);
+  frame:RegisterForDrag("LeftButton");
+  frame:SetScript("OnDragStart", function () lootFrame:StartMoving() end);
+  frame:SetScript("OnDragStop", function () lootFrame:StopMovingOrSizing() end );
+    frame:SetScript("OnEvent", function(self, event)
+        if event == "GET_ITEM_INFO_RECEIVED"then
+         lootModule:reQuery();
+        end
+         end);
+  return frame;
+end
+function lootModule:getResponseFrame(item, tempResponse)
+      if #responseFramePool == 0 then
       for i=1,5 do
-        table.insert(responseFramePool,FC_CreateResponseFrame(parent));
+        table.insert(responseFramePool,lootModule:createResponseFrame());
       end
       
     end
-    return table.remove(responseFramePool, 1);
+    local tempResponseFrame = table.remove(responseFramePool, 1);
+    
+      for i=1, options.numOfResponseButtons do
+      tempResponseFrame.buttons[i]:SetText(options.responseButtonNames[i]);
+      tempResponseFrame.buttons[i]:Show();
+      tempResponseFrame.buttons[i]:SetScript("OnClick", function(self)
+        tempResponse:setPlayerResponse(self:GetText());
+        tempResponse:setNote(tempResponseFrame.noteBox:GetText());
+        lootModule:removeResponse(tempResponseFrame.responseNum);
+        lootModule:SendCommMessage( "FLCPREFIX", "itemResponse ".. lootModule:Serialize({itemResponse = tempResponse}), "RAID" );
+         end);
+      end
+      
+      tempResponseFrame.responseNum = #currentResponses+ 1;
+      tempResponseFrame.iconFrame.texture:SetTexture(item:getItemTexture());
+      tempResponseFrame.lootItemName:SetText(GetItemInfo(item:getItemLink()));
+      tempResponseFrame.iconFrame.itemCountFontString:SetText(item:getCount());
+      
+      tempResponseFrame.iconFrame:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(tempResponseFrame.iconFrame, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink(item:getItemLink());
+        GameTooltip:Show()
+      end);
+    
+      tempResponseFrame.iconFrame:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+      end);
+      
+    
+    return tempResponseFrame;
+end
 
-end -- end FC_GetResponseFrame
-
-function FC_CreateResponseFrame(parent)
+function lootModule:createResponseFrame()
   
-  local tempFrame = CreateFrame("Frame", nil,  parent, "TooltipBorderedFrameTemplate");
+  local tempFrame = CreateFrame("Frame", nil,  lootFrame, "TooltipBorderedFrameTemplate");
   -- populate response window
   tempFrame:SetSize(900,100);
   local tempIconFrame = CreateFrame("Frame", nil,  tempFrame);
   tempIconFrame:SetSize(75,75);
   tempIconFrame:SetPoint("TopLeft",tempFrame , 15, -12 )
   
-  tempIconFrame.Texture = tempIconFrame:CreateTexture();
-  tempIconFrame.Texture:SetAllPoints(tempIconFrame);
+  tempIconFrame.texture = tempIconFrame:CreateTexture();
+  tempIconFrame.texture:SetAllPoints(tempIconFrame);
+  tempIconFrame.itemCountFontString = tempIconFrame:CreateFontString(nil,"low", "GameFontNormalHuge");  
+  tempIconFrame.itemCountFontString:SetPoint("bottomright",0,0);
     
-  tempFrame.IconFrame = tempIconFrame;  
+  tempFrame.iconFrame = tempIconFrame;
+
   
-    tempFrame.Buttons = {};
+    tempFrame.buttons = {};
     
     for i= 1, 7 do
       local tempButton = CreateFrame("Button", nil, tempFrame, "MagicButtonTemplate" );
@@ -266,7 +243,7 @@ function FC_CreateResponseFrame(parent)
       tempButton:Hide();
       tempButton:SetPoint("TopLeft",tempFrame, 110+ (110*(i-1)), -40);
       
-      tempFrame.Buttons[i] = tempButton;
+      tempFrame.buttons[i] = tempButton;
     end
     
     
@@ -279,38 +256,19 @@ function FC_CreateResponseFrame(parent)
     noteBox:SetScript("OnEnterPressed", function(self)
       self:ClearFocus();
     end);  
-    tempFrame.NoteBox = noteBox;
+    tempFrame.noteBox = noteBox;
     
-    tempFrame.LootItemName = tempFrame:CreateFontString(nil, "BACKGROUND", "GameFontNormal");
-    tempFrame.LootItemName:SetPoint("TopLeft" ,110, -20);
+    tempFrame.lootItemName = tempFrame:CreateFontString(nil, "BACKGROUND", "GameFontNormal");
+    tempFrame.lootItemName:SetPoint("TopLeft" ,110, -20);
     
   return tempFrame;
-end -- end createResponseFrame
-
-
-
-function FC_ReleaseResponseFrame(frame)
-  frame:Hide();
-  table.insert(responseFramePool, frame);
 end
-
-function FC_CreateLootFrame()
-
-  local frame = CreateFrame("Frame", "memberFrame", UIParent);
-  frame:SetFrameStrata("HIGH");
-  frame:Hide();
-  frame:SetPoint("CENTER", UIParent, "CENTER");
-  frame:SetSize(900,400);
-  frame:SetMovable(true);
-  frame:EnableMouse(true);
-  frame:RegisterForDrag("LeftButton");
-  frame:SetScript("OnDragStart", function () FusedCouncil_LootFrame:StartMoving() end);
-  frame:SetScript("OnDragStop", function () FusedCouncil_LootFrame:StopMovingOrSizing() end );
-  frame:SetScript("OnEvent", function(self, event)
-        if event == "GET_ITEM_INFO_RECEIVED"then
-        print("recived info")
-         ReQuery();
-        end
-         end);
-  return frame;
+function lootModule:removeResponse(index)
+    local responseFrame =table.remove(currentResponses, index);
+    responseFrame:Hide();
+    table.insert(responseFramePool, responseFrame);
+    for i=index, #currentResponses do
+      currentResponses[i].responseNum = currentResponses[i].responseNum -1;
+    end
+    lootModule:update();
 end

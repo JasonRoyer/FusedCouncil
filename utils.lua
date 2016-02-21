@@ -31,9 +31,19 @@ rankCompare = function(response1, response2)
 
 end;
 
-responseCompare = function(response1, response2)
+responseCompare = function(response1, response2, optionsTable)
 -- prob need to do options here?
-
+   local index1 = optionsTable.numOfResponseButtons;
+   local index2 = optionsTable.numOfResponseButtons;
+   for i=1, optionsTable.numOfResponseButtons do
+      if response1 == optionsTable.responseButtonNames[i] then
+          index1 = i;
+      end
+      if response2 == optionsTable.responseButtonNames[i] then
+        index2 = i;
+      end
+   end
+    return index1 < index2;
 end;
 
 noteCompare = function(response1, response2)
@@ -44,6 +54,14 @@ votesCompare = function(response1,response2)
    return #response1:getVotes() > #response2:getVotes();
 end;
 
-
+tableContains = function(table,element)
+   local flag  = false;
+   for i=1, #table do
+    if table[i] == element then
+      flag = true;
+    end
+   end
+   return flag;
+end;
 
 };

@@ -284,7 +284,7 @@ function FusedCouncil:Test(itemTable)
       if #itemLinks > 0 then
       local data = FusedCouncil:Serialize(itemLinks) -- itemLinks is a table of item links
       local optionsData = FusedCouncil:Serialize(FusedCouncil.db.profile.options);
-      FusedCouncil:SendCommMessage(addonPrefix, "lootTable " ..data .." " .. optionsData, "RAID");
+      FusedCouncil:SendCommMessage(addonPrefix, "lootTable " ..data .." " .. optionsData, "RAID"fusedCouncil:fusedCouncil:fusedCouncil:);
     
      FusedCouncil_Update();
       end
@@ -293,11 +293,9 @@ end -- end Test
 function playerInCouncil(options)
 for i=1, #options.lootCouncilMembers do
   if options.lootCouncilMembers[i] == UnitName("player") then
-    print("im on council")
     return true;
   end
 end
-  print("im not on council " .. UnitName("player"))
   return false;
 end
 function FusedCouncil:CoreCommHandler(prefix, message, distribution, sender)

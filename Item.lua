@@ -1,16 +1,22 @@
 Item = {}
 
-function Item:new(itemLink, count, responseTable)
+function Item:new(itemLink, count, responseTable, given)
   local newObject = {};
   setmetatable(newObject,self);
   self.__index = self;
-  newObject.itemLink = itemLink or "";
-  newObject.count = count or 1;
-  newObject.responseTable = responseTable or {};
-  _ , _ , newObject.itemRarity, _ , _ , _ , _ ,_ ,newObject.ItemEquipLoc, newObject.itemTexture = GetItemInfo(itemLink);
-
+  newObject.itemLink = itemLink.itemLink or itemLink or "";
+  newObject.count = itemLink.count or count or 1;
+  newObject.responseTable = itemLink.responseTable or responseTable or {};
+  _ , _ , newObject.itemRarity, _ , _ , _ , _ ,_ ,newObject.ItemEquipLoc, newObject.itemTexture = GetItemInfo(newObject.itemLink);
+  newObject.given = itemLink.given or given or {};
   return newObject;
 
+end
+function Item:give(player)
+  table.insert(self.given, player);
+end
+function Item:givenTo()
+  return self.given;
 end
 function Item:hasVoteFrom(player)
   for i=1, #self.responseTable do
